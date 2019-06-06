@@ -76,6 +76,10 @@ set(O2_HIT_PLUGIN_SRCS
     ${PLUGIN_SRC_DIR}/O2HitIntercept.cxx
     )
 
+set(O2_STEP_COUNT_PLUGIN_SRCS
+    ${PLUGIN_SRC_DIR}/O2StepCountIntercept.cxx
+    )
+
 include_directories(include/)
 
 # Required source for the executable
@@ -127,6 +131,11 @@ target_link_libraries(${MODULE_NAME} -lCore -lHist -lGraf -lGpad -lTree -lVMC -l
 add_library(O2HitIntercept SHARED ${O2_HIT_PLUGIN_SRCS})
 target_link_libraries(O2HitIntercept ${MODULE_NAME})
 set(PLUGINS ${PLUGINS} O2HitIntercept)
+
+# Plugins
+add_library(O2StepCountIntercept SHARED ${O2_STEP_COUNT_PLUGIN_SRCS})
+target_link_libraries(O2StepCountIntercept ${MODULE_NAME})
+set(PLUGINS ${PLUGINS} O2StepCountIntercept)
 
 # Add the executable to do analysis with the MCStepLogger output files
 add_executable(${EXECUTABLE_NAME} ${EXE_SRCS})

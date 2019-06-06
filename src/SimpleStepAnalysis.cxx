@@ -289,6 +289,8 @@ void SimpleStepAnalysis::finalize()
   histTraversedBeforeVsCurrentPerVol->GetXaxis()->SetTitle("traversed before");
   histTraversedBeforeVsCurrentPerVol->GetYaxis()->SetTitle("current module");
 
+  
+
   if(getenv("KEEPSTEPS")) {
     std::cout << "Writing step tree\n";
     steptree->Write();
