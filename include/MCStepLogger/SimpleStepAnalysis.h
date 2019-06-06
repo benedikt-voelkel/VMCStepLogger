@@ -96,6 +96,10 @@ class SimpleStepAnalysis : public MCAnalysis
   TH2D* histTraversedBeforeVsOriginPerVol;
   //TH2D* histTraversedBeforeVsOriginPerVol;
 
+  // Traversed before vs. current module
+  TH2D* histTraversedBeforeVsCurrentPerMod;
+  TH2D* histTraversedBeforeVsCurrentPerVol;
+
   // keep steps (under cutting for instance)
   TTree *steptree;
   TFile *stepfile;

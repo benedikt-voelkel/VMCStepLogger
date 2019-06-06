@@ -49,9 +49,13 @@ void registerAnalyses(const std::string& analysisDir)
     while ((file = (TSystemFile*)next())) {
       if (!file->IsDirectory()) {
         const std::string& filepath = analysisDir + "/" + file->GetName();
+        std::string fileNameStripped(file->GetName());
+        auto pos = fileNameStripped.find(".");
+        fileNameStripped = fileNameStripped.substr(0,pos);
+        fileNameStripped += "()";
         std::cerr << "Try to load analysis from " << filepath << std::endl;
         gROOT->LoadMacro(filepath.c_str());
-        gInterpreter->ProcessLine("declareAnalysis()");
+        gInterpreter->ProcessLine(fileNameStripped.c_str());
       }
     }
   }

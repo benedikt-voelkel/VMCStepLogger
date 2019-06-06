@@ -73,6 +73,10 @@ void SimpleStepAnalysis::initialize()
   histTraversedBeforeVsOriginPerMod = getHistogram<TH2D>("TraversedBeforeVsOriginPerMod", 1, 2., 1., 1, 2., 1.);
   histTraversedBeforeVsOriginPerVol = getHistogram<TH2D>("TraversedBeforeVsOriginPerVol", 1, 2., 1., 1, 2., 1.);
 
+  // Traversed before vs. current module
+  histTraversedBeforeVsCurrentPerMod = getHistogram<TH2D>("TraversedBeforeVsCurrentPerMod", 1, 2., 1., 1, 2., 1.);
+  histTraversedBeforeVsCurrentPerVol = getHistogram<TH2D>("TraversedBeforeVsCurrentPerVol", 1, 2., 1., 1, 2., 1.);
+
   // init runtime user cut
   // thanks to discussions with Philippe Canal, Fermilab
   auto cutcondition = getenv("MCSTEPCUT");
@@ -202,11 +206,13 @@ void SimpleStepAnalysis::analyze(const std::vector<StepInfo>* const steps, const
     if(volName.compare(oldVolName) != 0 || newtrack) {
       histTraversedBeforePerVol->Fill(oldVolName.c_str(), 1);
       histTraversedBeforeVsOriginPerVol->Fill(originVolName.c_str(), oldVolName.c_str(), 1);
+      histTraversedBeforeVsCurrentPerVol->Fill(oldVolName.c_str(), volName.c_str(), 1);
       // This can be nested here since a module change implies a volume change,
       // but not necessarily the other way round
       if(modName.compare(oldModName) != 0 || newtrack) {
         histTraversedBeforePerMod->Fill(oldModName.c_str(), 1);
         histTraversedBeforeVsOriginPerMod->Fill(originModName.c_str(), oldModName.c_str(), 1);
+        histTraversedBeforeVsCurrentPerMod->Fill(oldModName.c_str(), modName.c_str(), 1);
       }
     }
 
@@ -272,6 +278,16 @@ void SimpleStepAnalysis::finalize()
   histTraversedBeforeVsOriginPerVol->LabelsDeflate("Y");
   histTraversedBeforeVsOriginPerVol->GetXaxis()->SetTitle("origins");
   histTraversedBeforeVsOriginPerVol->GetYaxis()->SetTitle("traversed before");
+
+  histTraversedBeforeVsCurrentPerMod->LabelsDeflate("X");
+  histTraversedBeforeVsCurrentPerMod->LabelsDeflate("Y");
+  histTraversedBeforeVsCurrentPerMod->GetXaxis()->SetTitle("traversed before");
+  histTraversedBeforeVsCurrentPerMod->GetYaxis()->SetTitle("current module");
+
+  histTraversedBeforeVsCurrentPerVol->LabelsDeflate("X");
+  histTraversedBeforeVsCurrentPerVol->LabelsDeflate("Y");
+  histTraversedBeforeVsCurrentPerVol->GetXaxis()->SetTitle("traversed before");
+  histTraversedBeforeVsCurrentPerVol->GetYaxis()->SetTitle("current module");
 
   if(getenv("KEEPSTEPS")) {
     std::cout << "Writing step tree\n";
