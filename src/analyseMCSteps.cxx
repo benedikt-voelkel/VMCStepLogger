@@ -49,9 +49,13 @@ void registerAnalyses(const std::string& analysisDir)
     while ((file = (TSystemFile*)next())) {
       if (!file->IsDirectory()) {
         const std::string& filepath = analysisDir + "/" + file->GetName();
+        std::string fileNameStripped(file->GetName());
+        auto pos = fileNameStripped.find(".");
+        fileNameStripped = fileNameStripped.substr(0,pos);
+        fileNameStripped += "()";
         std::cerr << "Try to load analysis from " << filepath << std::endl;
         gROOT->LoadMacro(filepath.c_str());
-        gInterpreter->ProcessLine("declareAnalysis()");
+        gInterpreter->ProcessLine(fileNameStripped.c_str());
       }
     }
   }
@@ -66,8 +70,8 @@ int analyze(const bpo::variables_map& vm, std::string& errorMessage)
   }
   //////////////////////////////////////////////////////////////////////////////////////////////
   // now the check for ROOT files
-  if (!vm.count("root-file") && !vm.count("list-analyses")) {
-    errorMessage += "Need ROOT file from MCStepLogger.\n";
+  if (!vm.count("root-files") && !vm.count("list-analyses")) {
+    errorMessage += "Need ROOT file(s) from MCStepLogger.\n";
   }
   //////////////////////////////////////////////////////////////////////////////////////////////
   // is there an output directory?
@@ -105,7 +109,10 @@ int analyze(const bpo::variables_map& vm, std::string& errorMessage)
   //////////////////////////////////////////////////////////////////////////////////////////////
   // set a label and the input file from MCStepLogger
   anamgr.setLabel(vm["label"].as<std::string>());
-  anamgr.setInputFilepath(vm["root-file"].as<std::string>());
+  auto filepaths = vm["root-files"].as<std::vector<std::string>>();
+  for(auto& path : filepaths) {
+    anamgr.addInputFilepath(path);
+  }
   // if ready, run
   if (!anamgr.checkReadiness()) {
     return 1;
@@ -121,21 +128,24 @@ int analyze(const bpo::variables_map& vm, std::string& errorMessage)
 //       In that case, the meta info is printed
 int checkFile(const bpo::variables_map& vm, std::string& errorMessage)
 {
-  if (!vm.count("root-file")) {
-    errorMessage += "ROOT file required.\n";
+  if (!vm.count("root-files")) {
+    errorMessage += "ROOT file(s) required.\n";
   }
   if (!errorMessage.empty()) {
     return 1;
   }
-  std::cerr << "INFO: Check type and sanity of the input file " << vm["root-file"].as<std::string>() << std::endl;
+  std::cerr << "INFO: Check type and sanity of the input file " << vm["root-files"].as<std::string>() << std::endl;
   MCAnalysisFileWrapper fileWrapper;
-  if (fileWrapper.read(vm["root-file"].as<std::string>())) {
+  if (fileWrapper.read(vm["root-files"].as<std::string>())) {
     fileWrapper.printAnalysisMetaInfo();
     fileWrapper.printHistogramInfo();
     return 0;
   }
   auto& anamgr = MCAnalysisManager::Instance();
-  anamgr.setInputFilepath(vm["root-file"].as<std::string>());
+  auto filepaths = vm["root-files"].as<std::vector<std::string>>();
+  for(auto& path : filepaths) {
+    anamgr.addInputFilepath(path);
+  }
   if (anamgr.dryrun()) {
     return 0;
   }
@@ -147,10 +157,18 @@ int checkFile(const bpo::variables_map& vm, std::string& errorMessage)
 void initializeForRun(const std::string& cmd, bpo::options_description& cmdOptionsDescriptions, std::function<int(const bpo::variables_map&, std::string&)>& cmdFunction)
 {
   if (cmd == "analyze") {
-    cmdOptionsDescriptions.add_options()("help,h", "show this help message and exit")("analyses,a", bpo::value<std::vector<std::string>>()->multitoken(), "analyses to be run")("analysis-dir,d", bpo::value<std::string>(), "directory containing analysis macros (required, if --analyses is used)")("list-analyses,s", "list available analyses and exit")("root-file,f", bpo::value<std::string>(), "ROOT file from MCStepLogger to be analysed (required)")("label,l", bpo::value<std::string>(), "custom label for the analysis (required)")("output-dir,o", bpo::value<std::string>(), "output directory for analyses (required)")("number-events,n", bpo::value<int>()->default_value(-1), "only analyse a certain number of events");
+    cmdOptionsDescriptions.add_options()(
+      "help,h", "show this help message and exit")(
+      "analyses,a", bpo::value<std::vector<std::string>>()->multitoken(), "analyses to be run")(
+      "analysis-dir,d", bpo::value<std::string>(), "directory containing analysis macros (required, if --analyses is used)")(
+      "list-analyses,s", "list available analyses and exit")(
+      "root-files,f", bpo::value<std::vector<std::string>>()->multitoken(), "ROOT files from MCStepLogger to be analysed (required)")(
+      "label,l", bpo::value<std::string>(), "custom label for the analysis (required)")(
+      "output-dir,o", bpo::value<std::string>(), "output directory for analyses (required)")(
+      "number-events,n", bpo::value<int>()->default_value(-1), "only analyse a certain number of events");
     cmdFunction = analyze;
   } else if (cmd == "checkFile") {
-    cmdOptionsDescriptions.add_options()("help,h", "show this help message and exit")("root-file,f", bpo::value<std::string>(), "ROOT file to be checked");
+    cmdOptionsDescriptions.add_options()("help,h", "show this help message and exit")("root-files,f", bpo::value<std::string>(), "ROOT file to be checked");
     cmdFunction = checkFile;
   }
 }

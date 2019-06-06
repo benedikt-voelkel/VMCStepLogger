@@ -96,9 +96,61 @@ class SimpleStepAnalysis : public MCAnalysis
   TH2D* histTraversedBeforeVsOriginPerVol;
   //TH2D* histTraversedBeforeVsOriginPerVol;
 
+  // Traversed before vs. current module
+  TH2D* histTraversedBeforeVsCurrentPerMod;
+  TH2D* histTraversedBeforeVsCurrentPerVol;
+
   // keep steps (under cutting for instance)
   TTree *steptree;
   TFile *stepfile;
+
+  // Monitor time elapsed per module
+  TH1F* histTimePerMod;
+
+  // Time per PDG
+  TH1F* histTimePerPDG;
+
+  // Check tracks completely conatined in a module
+  TH1I* histProducedAndKilledPerMod;
+
+  // Spatial distributions of steps having produced a hit
+  TH1I* histHitsX;
+  TH1I* histHitsY;
+  TH1I* histHitsZ;
+
+  // Momenutum distributions of steps having produced a hit, as log10f(p)
+  TH1I* histHitsE;
+  TH1I* histHitsPx;
+  TH1I* histHitsPy;
+  TH1I* histHitsPz;
+
+  // Spatial distributions of all steps
+  TH1I* histStepsX;
+  TH1I* histStepsY;
+  TH1I* histStepsZ;
+
+  // Momenutum distribution of all steps, as log10f(p)
+  TH1I* histStepsE;
+  TH1I* histStepsPx;
+  TH1I* histStepsPy;
+  TH1I* histStepsPz;
+
+  // Monitor steps of particles created and killed inside a module
+  TH1I* histNStepsOnlyInsidePerMod;
+
+  // PDG vs. module
+  TH2D* histPDGvsModule;
+
+  // Produced and killed differential
+  // PDG vs. mod
+  TH2D* histProducedAndKilledPDGvsMod;
+  // energy vs. mod
+  TH2D* histProducedAndKilledEnergyvsMod;
+  // Produced and survived differential
+  // PDG vs. mod
+  TH2D* histProducedAndSurvivedPDGvsMod;
+  // energy vs. mod
+  TH2D* histProducedAndSurvivedEnergyvsMod;
 
   // pointing to a user cut function
   cut_function_type* mUserCutFunction = nullptr; //!

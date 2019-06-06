@@ -36,6 +36,8 @@ namespace mcsteploggerutilities
 
   const char* getLogFileName();
 
+  const char* getAnalysisDir();
+
   const char* getVolMapFile();
 
   const char* getSensitiveVolFile();

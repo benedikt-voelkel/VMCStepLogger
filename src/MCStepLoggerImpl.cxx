@@ -18,28 +18,15 @@
 #include "MCStepLogger/StepLogger.h"
 #include "MCStepLogger/FieldLogger.h"
 #include "MCStepLogger/StepLoggerUtilities.h"
-#include <TBranch.h>
-#include <TClonesArray.h>
-#include <TFile.h>
-#include <TGeoManager.h>
-#include <TGeoVolume.h>
-#include <TTree.h>
+#include "MCStepLogger/MCAnalysisManager.h"
+#include "MCStepLogger/SimpleStepAnalysis.h"
 #include <TVirtualMC.h>
 #include <TVirtualMCApplication.h>
 #include <TVirtualMagField.h>
-#include <sstream>
 
-#include <dlfcn.h>
-#include <cstdlib>
-#include <fstream>
-#include <iostream>
-#include <map>
-#include <set>
-#include <sstream>
 #ifdef NDEBUG
 #undef NDEBUG
 #endif
-#include <cassert>
 
 // the global logging instances (in anonymous namespace)
 // pointers to dissallow construction at each library load
@@ -47,6 +34,7 @@
 namespace o2 {
 StepLogger* logger;
 FieldLogger* fieldlogger;
+mcstepanalysis::MCAnalysisManager* anaMgr;
 }
 
 // a generic function that can dispatch to the original method of a TVirtualMCApplication
@@ -83,12 +71,30 @@ extern "C" void initLogger()
   // initializes the logging instances
   o2::logger = &o2::StepLogger::Instance();
   o2::fieldlogger = &o2::FieldLogger::Instance();
+  if(std::getenv("ANALYZE")) {
+    // Prepare MCAnalysisManager for immediate analysis of steps
+    o2::anaMgr = &o2::mcstepanalysis::MCAnalysisManager::Instance();
+    new o2::mcstepanalysis::SimpleStepAnalysis();
+    o2::anaMgr->setMode(o2::mcstepanalysis::EAnalysisMode::kEVENT);
+  }
 }
 
 extern "C" void flushLog()
 {
-  std::cerr << "[MCLOGGER:] START FLUSHING ----\n";
-  o2::logger->flush();
-  o2::fieldlogger->flush();
-  std::cerr << "[MCLOGGER:] END FLUSHING ----\n";
+  if(std::getenv("ANALYZE")) {
+    // Immediately analyse the steps
+      o2::anaMgr->analyzeEvent(o2::logger->getContainer(), o2::fieldlogger->getContainer(), o2::logger->getLookups());
+      o2::logger->clearAll();
+      o2::fieldlogger->clear();
+      if(o2::anaMgr->getEventNumber() == atoi(std::getenv("ANALYZE"))) {
+        o2::anaMgr->finalizeEvents();
+        o2::anaMgr->write(o2::mcsteploggerutilities::getAnalysisDir());
+        o2::anaMgr->terminate();
+      }
+  } else {
+    std::cerr << "[MCLOGGER:] START FLUSHING ----\n";
+    o2::logger->flush();
+    o2::fieldlogger->flush();
+    std::cerr << "[MCLOGGER:] END FLUSHING ----\n";
+  }
 }

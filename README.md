@@ -113,6 +113,12 @@ Information collected and stored in `MCStepLoggerOutput.root` can be further inv
 mcStepAnalysis <command> --help
 ```
 
+The analysis can also be done during simulation which is especially useful when O(10) or even more events are processed as the step log output file easily exceeds O(1) GB file size. An analysis is done on the fly by specifying the environment variable `ANALYZE` e.g. as follows
+```bash
+ANALYZE=5 LD_PRELOAD=... o2-sim-serial ... -n 5
+```
+As the command line argument of `o2-sim-serial` is `O2` specific while `MCStepLogger` is not, the number of events to be analysed needs to be specified twice here. This ensures that the analysis is finalised after the given number and the analysis file is written to disk.
+
 ### File formats
 
 2 file formats having a standardised structure play a role. On one hand, these are the files produced by the step logging which are the input files for the analysis as explained in the following. On the other hand, each analysis produces an output file containing histograms along with some meta information. Sanity and the type of the file can be checked via

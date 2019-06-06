@@ -184,10 +184,14 @@ struct StepInfo {
   int volId = -1;  // keep another branch somewhere mapping this to name, medium, etc.
   int copyNo = -1;
   int trackID = -1;
+  int parentTrackID = -1;
   float x = 0.;
   float y = 0.;
   float z = 0.;
   float E = 0.;
+  float px;
+  float py;
+  float pz;
   float step = 0.;
   float maxstep = 0.;
   int nsecondaries = 0;
@@ -199,12 +203,14 @@ struct StepInfo {
   bool newtrack = false;             // if track is new
   bool insensitiveRegion = false;    // whether step done in sensitive region
   int detectorHitId = -1;            // Monitor the detector ID in case this step produced a hit
+  long timediff = 0;                 // time difference from last step
 
   const char* getProdProcessAsString() const;
 
   static int stepcounter;           //!
   static StepInfo* currentinstance; //!
   static std::chrono::time_point<std::chrono::high_resolution_clock> starttime;
+  static std::chrono::time_point<std::chrono::high_resolution_clock> lasttime;
   static void resetCounter() { stepcounter = -1; }
   static std::map<std::string, std::string>* volnametomodulemap;
   static std::vector<std::string*> volidtomodulevector;

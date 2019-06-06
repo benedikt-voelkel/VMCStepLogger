@@ -12,15 +12,13 @@
 #ifndef FIELDLOGGER_H_
 #define FIELDLOGGER_H_
 
+#include <vector>
+#include <map>
+#include <string>
+
 #include "MCStepLogger/StepInfo.h"
-#include "MCStepLogger/MetaInfo.h"
-#include "MCStepLogger/StepLoggerUtilities.h"
-#include <TBranch.h>
-#include <TClonesArray.h>
-#include <TTree.h>
-#include <TVirtualMC.h>
-#include <TVirtualMCApplication.h>
-#include <iostream>
+
+class TVirtualMC;
 
 namespace o2
 {
@@ -35,65 +33,18 @@ class FieldLogger
   std::vector<MagCallInfo> callcontainer;
 
  public:
-  FieldLogger()
-  {
-    // check if streaming or interactive
-    // configuration done via env variable
-    if (std::getenv("MCSTEPLOG_TTREE")) {
-      mTTreeIO = true;
-    }
-  }
+  FieldLogger();
 
-  static FieldLogger& Instance()
-  {
-    static FieldLogger logger;
-    return logger;
-  }
+  static FieldLogger& Instance();
 
-  void addStep(TVirtualMC* mc, const double* x, const double* b)
-  {
-    if (mTTreeIO) {
-      callcontainer.emplace_back(mc, x[0], x[1], x[2], b[0], b[1], b[2]);
-      return;
-    }
-    counter++;
-    int copyNo;
-    auto id = mc->CurrentVolID(copyNo);
-    if (volumetosteps.find(id) == volumetosteps.end()) {
-      volumetosteps.insert(std::pair<int, int>(id, 0));
-    } else {
-      volumetosteps[id]++;
-    }
-    if (idtovolname.find(id) == idtovolname.end()) {
-      idtovolname.insert(std::pair<int, std::string>(id, std::string(mc->CurrentVolName())));
-    }
-  }
+  void addStep(TVirtualMC* mc, const double* x, const double* b);
 
-  void clear()
-  {
-    counter = 0;
-    volumetosteps.clear();
-    idtovolname.clear();
-    if (mTTreeIO) {
-      callcontainer.clear();
-    }
-  }
+  void clear();
 
-  void flush()
-  {
-    if (mTTreeIO) {
-      mcsteploggerutilities::flushToTTree("Calls", &callcontainer);
-    } else {
-      std::cerr << "[FIELDLOGGER]: did " << counter << " steps \n";
-      // summarize steps per volume
-      for (auto& p : volumetosteps) {
-        std::cerr << "[FIELDLOGGER]: VolName " << idtovolname[p.first] << " COUNT " << p.second;
-        std::cerr << "\n";
-      }
-      std::cerr << "[FIELDLOGGER]: ----- END OF EVENT ------\n";
-    }
-    clear();
-  }
+  void flush();
+
+  std::vector<MagCallInfo>* getContainer();
+
 };
 
 } // namespace o2

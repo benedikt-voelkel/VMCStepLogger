@@ -24,9 +24,10 @@ using namespace o2::mcstepanalysis;
   mHistogramPropertiesJSON = filepath;
 }*/
 
-void MCAnalysisManager::setInputFilepath(const std::string& filepath)
+
+void MCAnalysisManager::addInputFilepath(const std::string& filepath)
 {
-  mInputFilepath = filepath;
+  mInputFilepaths.push_back(filepath);
 }
 
 void MCAnalysisManager::registerAnalysis(MCAnalysis* analysis)
@@ -45,8 +46,8 @@ void MCAnalysisManager::registerAnalysis(MCAnalysis* analysis)
 bool MCAnalysisManager::checkReadiness() const
 {
   std::string errorMessage;
-  if (mInputFilepath.empty()) {
-    errorMessage += "Input file required...\n";
+  if (mInputFilepaths.empty()) {
+    errorMessage += "Input file(s) required...\n";
   }
   if (mLabel.empty()) {
     errorMessage += "Label required...\n";
@@ -71,8 +72,8 @@ void MCAnalysisManager::run(int nEvents)
 
 bool MCAnalysisManager::dryrun()
 {
-  if (mInputFilepath.empty()) {
-    std::cerr << "FATAL: Input file required...\n";
+  if (mInputFilepaths.empty()) {
+    std::cerr << "FATAL: Input file(s) required...\n";
     exit(1);
   }
   return analyze(-1, true);
@@ -109,72 +110,99 @@ bool MCAnalysisManager::analyze(int nEvents, bool isDryrun)
     return false;
   }
   // taking only the first entry is a hack! \todo change this by enabling also for TChains
-  ROOTIOUtilities rootutil(mInputFilepath);
+  for(auto& path : mInputFilepaths) {
+    ROOTIOUtilities rootutil(path);
 
-  // this is by default opening the file in READ mode
-  if (!rootutil.changeToTTree(mAnalysisTreename)) {
-    rootutil.close();
-    if (isDryrun) {
-      return false;
-    }
-    std::cerr << "FATAL: Tree " << mAnalysisTreename << " could not be found in file " << mInputFilepath << std::endl;
-    exit(1);
-  }
-  // print warning if desired number of entries is bigger than number of present entries
-  if (nEvents > rootutil.nEntries()) {
-    std::cerr << "WARNING: You want to process " << nEvents << ", however only " << rootutil.nEntries() << " are present.\n";
-  }
-
-  // prepare variables and connect to branches
-  // \todo align branch names with MCStepLogger and get rid of hard coded names
-  if (!rootutil.setBranch("Steps", &mCurrentStepInfo) || !rootutil.setBranch("Calls", &mCurrentMagCallInfo) || !rootutil.setBranch("Lookups", &mCurrentLookups)) {
-    rootutil.close();
-    if (isDryrun) {
-      return false;
-    }
-    std::cerr << "FATAL: Cannot find required branches in TTree " << mAnalysisTreename << std::endl;
-    exit(1);
-  }
-  // process tree and analyze
-  while (rootutil.processTTree()) {
-    if (nEvents <= mCurrentEventNumber && nEvents > 0) {
-      break;
-    }
-    // check whether all pointers to MCStepLogger branches are set...
-    if (mCurrentStepInfo == nullptr || mCurrentMagCallInfo == nullptr || mCurrentLookups == nullptr) {
+    // this is by default opening the file in READ mode
+    if (!rootutil.changeToTTree(mAnalysisTreename)) {
       rootutil.close();
       if (isDryrun) {
         return false;
       }
-      std::cerr << "FATAL: Obtained nullptrs while processing TTree " << mAnalysisTreename << std::endl;
+      std::cerr << "FATAL: Tree " << mAnalysisTreename << " could not be found in file " << path << std::endl;
       exit(1);
     }
-    // ... if so, next event
-    mCurrentEventNumber++;
-    mNSteps += mCurrentStepInfo->size();
-
-    std::cout << "---> Event " << mCurrentEventNumber << " <---\n";
-    std::cout << "#steps: " << mCurrentStepInfo->size() << "\n";
-    std::cout << "#mag field calls: " << mCurrentMagCallInfo->size() << "\n";
-    std::cout << "#vol IDs " << mCurrentLookups->volidtovolname.size() << "\n";
-    if (!isDryrun) {
-      std::cout << "\nStart..." << std::endl;
-      for (auto& a : mAnalyses) {
-        std::cout << "\t\tCall analysis " << a->name() << std::endl;
-        a->analyze(mCurrentStepInfo, mCurrentMagCallInfo);
-      }
-      std::cout << "Done\n";
+    // print warning if desired number of entries is bigger than number of present entries
+    if (nEvents > rootutil.nEntries()) {
+      std::cerr << "WARNING: You want to process " << nEvents << ", however only " << rootutil.nEntries() << " are present.\n";
     }
+
+    // prepare variables and connect to branches
+    // \todo align branch names with MCStepLogger and get rid of hard coded names
+    if (!rootutil.setBranch("Steps", &mCurrentStepInfo) || !rootutil.setBranch("Calls", &mCurrentMagCallInfo) || !rootutil.setBranch("Lookups", &mCurrentLookups)) {
+      rootutil.close();
+      if (isDryrun) {
+        return false;
+      }
+      std::cerr << "FATAL: Cannot find required branches in TTree " << mAnalysisTreename << std::endl;
+      exit(1);
+    }
+    // process tree and analyze
+    while (rootutil.processTTree()) {
+      if (nEvents <= mCurrentEventNumber && nEvents > 0) {
+        break;
+      }
+      // check whether all pointers to MCStepLogger branches are set...
+      if (mCurrentStepInfo == nullptr || mCurrentMagCallInfo == nullptr || mCurrentLookups == nullptr) {
+        rootutil.close();
+        if (isDryrun) {
+          return false;
+        }
+        std::cerr << "FATAL: Obtained nullptrs while processing TTree " << mAnalysisTreename << std::endl;
+        exit(1);
+      }
+      // ... if so, next event
+      mCurrentEventNumber++;
+      mNSteps += mCurrentStepInfo->size();
+
+      printEvent();
+      if (!isDryrun) {
+        analyzeSingleEvent();
+      }
+    }
+    std::cerr << "INFO: Analysis run on file " << path << " done.\n";
+    rootutil.close();
   }
-  rootutil.close();
   if (!isDryrun) {
-    std::cerr << "INFO: Analysis run on file " << mInputFilepath << " done.\n";
     mIsAnalyzed = true;
   } else {
     mCurrentEventNumber = 0;
     mNSteps = 0;
   }
   return true;
+}
+
+void MCAnalysisManager::printEvent() const
+{
+  std::cout << "---> Event " << mCurrentEventNumber << " <---\n";
+  std::cout << "#steps: " << mCurrentStepInfo->size() << "\n";
+  std::cout << "#mag field calls: " << mCurrentMagCallInfo->size() << "\n";
+  std::cout << "#vol IDs " << mCurrentLookups->volidtovolname.size() << "\n";
+}
+
+void MCAnalysisManager::analyzeSingleEvent()
+{
+  if(!mIsInitialized) {
+    initialize();
+    mIsInitialized = true;
+  }
+  std::cout << "\nStart..." << std::endl;
+  for (auto& a : mAnalyses) {
+    std::cout << "\t\tCall analysis " << a->name() << std::endl;
+    a->analyze(mCurrentStepInfo, mCurrentMagCallInfo);
+  }
+  std::cout << "Done\n";
+}
+
+void MCAnalysisManager::analyzeEvent(std::vector<o2::StepInfo>* stepInfo, std::vector<o2::MagCallInfo>* magCallInfo,
+                                     o2::StepLookups* lookups)
+{
+  mCurrentEventNumber++;
+  mCurrentStepInfo = stepInfo;
+  mCurrentMagCallInfo = magCallInfo;
+  mCurrentLookups = lookups;
+  printEvent();
+  analyzeSingleEvent();
 }
 
 void MCAnalysisManager::finalize()

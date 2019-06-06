@@ -39,6 +39,8 @@ namespace mcstepanalysis
 class MCAnalysis;
 class MCAnalysisFileWrapper;
 
+enum class EAnalysisMode {kFILE, kEVENT, kNONE};
+
 class MCAnalysisManager
 {
  public:
@@ -55,6 +57,15 @@ class MCAnalysisManager
   bool checkReadiness() const;
   /// run tha chain depending on the mode
   void run(int nEvents = -1);
+  /// run a single event analysis
+  void analyzeEvent(std::vector<o2::StepInfo>* stepInfo, std::vector<o2::MagCallInfo>* magCallInfo,
+                    o2::StepLookups* lookups);
+  /// finalize a single event run
+  void finalizeEvents()
+  {
+    mIsAnalyzed = true;
+    finalize();
+  }
   /// do a dryrun just to see what's in the MCStepLogger ROOT file
   bool dryrun();
   /// write produced analysis data to disk
@@ -66,14 +77,19 @@ class MCAnalysisManager
   //
   /// set the file path to overwrite histogram properties used in MCAnalysis
   //void setHistogramPropertiesFile(const std:;string& filepath);
-  /// set the path to the MCStepLogger input file path
-  void setInputFilepath(const std::string& filepath);
+  // Add an input file
+  void addInputFilepath(const std::string& filepath);
   // register analysis to manager, done implicitly in the base Analysis class during construction
   void registerAnalysis(MCAnalysis* analysis);
   /// label for an analysis run (e.g. 'GEANT4_allModules')
   void setLabel(const std::string& label);
   /// name of the TTree of the MCStepLogger output
   void setStepLoggerTreename(const std::string& treename);
+  /// the analysis mode
+  void setMode(EAnalysisMode mode)
+  {
+    mAnalysisMode = mode;
+  }
   //
   // getting
   //
@@ -97,6 +113,8 @@ class MCAnalysisManager
   //
   /// print registered analyses
   void printAnalyses() const;
+  /// print event info
+  void printEvent() const;
 
  private:
   // don't allow uncontrolled construction of AnalysisManager objects
@@ -110,6 +128,7 @@ class MCAnalysisManager
   void initialize();
   /// analyse events and forward vectors of step and magnetic field info to single analyses
   bool analyze(int nEvents = -1, bool isDryrun = false);
+  void analyzeSingleEvent();
   /// finalize all analyses
   void finalize();
 
@@ -121,8 +140,8 @@ class MCAnalysisManager
   /// keep track of status of MCAnalysisManager
   bool mIsInitialized = false;
   bool mIsAnalyzed = false;
-  /// the input file the analysis is conducted on
-  std::string mInputFilepath = "";
+  /// Summarizing all input filepaths
+  std::vector<std::string> mInputFilepaths;
   /// treename of step log data
   std::string mAnalysisTreename = defaults::defaultStepLoggerTTreeName;
   /// label for analyses, this is the same for all analyses since it depends on the simulation run and not on a specific analysis
@@ -142,6 +161,8 @@ class MCAnalysisManager
   std::vector<MCAnalysisFileWrapper> mAnalysisFiles;
   /// A JSON file to overwrite histogram properties used in MCAnalysis objects
   //std::string mHistogramPropertiesJSON = "";
+  /// The analysis mode, default is running over a file
+  EAnalysisMode mAnalysisMode = EAnalysisMode::kFILE;
 
   ClassDefNV(MCAnalysisManager, 1);
 };

@@ -26,6 +26,15 @@ const char* getLogFileName()
   }
 }
 
+const char* getAnalysisDir()
+{
+  if (const char* f = std::getenv("ANALYSIS_OUTDIR")) {
+    return f;
+  } else {
+    return "MCStepLoggerAnalysis";
+  }
+}
+
 const char* getVolMapFile()
 {
   if (const char* f = std::getenv("MCSTEPLOG_VOLMAPFILE")) {

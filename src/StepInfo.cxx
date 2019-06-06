@@ -44,12 +44,22 @@ StepInfo::StepInfo(TVirtualMC* mc)
   if (stepcounter == -1) {
     starttime = std::chrono::high_resolution_clock::now();
   }
+
   stepcounter++;
   stepid = stepcounter;
+
+  if(mc->IsNewTrack()) {
+    lasttime = std::chrono::high_resolution_clock::now();
+  }
+
+  auto now = std::chrono::high_resolution_clock::now();
+
+  timediff = std::chrono::duration_cast<std::chrono::nanoseconds>(now - lasttime).count();
 
   auto stack = mc->GetStack();
 
   trackID = stack->GetCurrentTrackNumber();
+  parentTrackID = stack->GetCurrentParentTrackNumber();
   lookupstructures.insertPDG(trackID, mc->TrackPid());
 
   auto id = mc->CurrentVolID(copyNo);
@@ -106,9 +116,8 @@ StepInfo::StepInfo(TVirtualMC* mc)
   z = zd;
   step = mc->TrackStep();
   maxstep = mc->MaxStep();
-  E = mc->Etot();
-  auto now = std::chrono::high_resolution_clock::now();
-  // cputimestamp = std::chrono::duration_cast<std::chrono::nanoseconds>(now - starttime).count();
+  mc->TrackMomentum(px, py, pz, E);
+
   nsecondaries = mc->NSecondaries();
 
   if (nsecondaries > 0) {
@@ -134,6 +143,8 @@ StepInfo::StepInfo(TVirtualMC* mc)
   exited = mc->IsTrackExiting();
   entered = mc->IsTrackEntering();
   newtrack = mc->IsNewTrack();
+
+  lasttime = std::chrono::high_resolution_clock::now();
 }
 
 const char* StepInfo::getProdProcessAsString() const {
@@ -141,6 +152,7 @@ const char* StepInfo::getProdProcessAsString() const {
 }
 
 std::chrono::time_point<std::chrono::high_resolution_clock> StepInfo::starttime;
+std::chrono::time_point<std::chrono::high_resolution_clock> StepInfo::lasttime;
 int StepInfo::stepcounter = -1;
 std::map<std::string, std::string>* StepInfo::volnametomodulemap = nullptr;
 std::vector<std::string*> StepInfo::volidtomodulevector;
@@ -162,7 +174,7 @@ int MagCallInfo::stepcounter = -1;
 bool StepLookups::initSensitiveVolLookup(const std::string& filename)
 {
 
-  
+
   if (!gGeoManager) {
     std::cerr << "[MCSTEPLOG] : Cannot setup sensitive lookup since GeoManager not found \n";
     return false;
