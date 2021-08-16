@@ -4,3 +4,6 @@ get_filename_component(_dir "${CMAKE_CURRENT_LIST_FILE}" PATH)
 
 # Import targets
 include("${_dir}/MCStepLoggerTargets.cmake")
+
+# Mark whether or not TMCReplay was built
+HAS_TMCReplay=@MCStepLogger_BUILD_TMCReplay@
