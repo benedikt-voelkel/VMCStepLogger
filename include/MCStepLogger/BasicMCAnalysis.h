@@ -53,6 +53,8 @@
 
 #include "MCStepLogger/MCAnalysis.h"
 
+// This is a comment
+
 namespace o2
 {
 namespace mcstepanalysis
