@@ -33,20 +33,6 @@ class TMCReplay : public TVirtualMC
     /// For now just default destructor
     virtual ~TMCReplay();
 
-  protected:
-    // Push n particles of pdg to stack
-    void PushTracks(int toBeDone, int parentId, int pdg, double px, double py, double pz, double e,
-                    double x, double y, double z, double t, double polX, double polY, double polZ,
-                    TMCProcess proc, double weight, int is)
-    {
-      int ntr = -1;
-      TVirtualMCStack* stack = GetStack();
-      stack->PushTrack(toBeDone, parentId, pdg, px, py, pz, e, x, y, z, t, polX, polY, polZ,
-                       proc, ntr, weight, is);
-    }
-
-
-  public:
     //
     // All the derived stuff
     //
@@ -781,46 +767,29 @@ class TMCReplay : public TVirtualMC
    //
 
    /// Return the current volume ID and copy number
-   virtual Int_t CurrentVolID(Int_t& copyNo) const override
-   {
-     copyNo = fCurrentStep->copyNo;
-     return fCurrentStep->volId;
-   }
+   virtual Int_t CurrentVolID(Int_t& copyNo) const override;
 
    /// Return the current volume off upward in the geometrical tree
    /// ID and copy number
-   virtual Int_t CurrentVolOffID(Int_t off, Int_t& copyNo) const override
-   {
-     Warning("CurrentVolOffID", "Not yet implemented");
-     return -1;
-   }
+   virtual Int_t CurrentVolOffID(Int_t off, Int_t& copyNo) const override;
 
    /// Return the current volume name
-   virtual const char* CurrentVolName() const override
-   {
-     return fCurrentLookups->volidtovolname[fCurrentStep->volId]->c_str();
-   }
+   virtual const char* CurrentVolName() const override;
+
 
    /// Return the current volume off upward in the geometrical tree
    /// name and copy number'
    /// if name=0 no name is returned
-   virtual const char* CurrentVolOffName(Int_t off) const override
-   {
-     Warning("CurrentVolOffName", "Not yet implemented");
-     return "";
-   }
+   virtual const char* CurrentVolOffName(Int_t off) const override;
 
    /// Return the path in geometry tree for the current volume
-   virtual const char* CurrentVolPath() override
-   {
-     Warning("CurrentVolPath", "Not yet implemented");
-     return "";
-   }
+   virtual const char* CurrentVolPath() override;
 
    /// If track is on a geometry boundary, fill the normal vector of the crossing
    /// volume surface and return true, return false otherwise
    virtual Bool_t CurrentBoundaryNormal(Double_t &x, Double_t &y, Double_t &z) const override
    {
+     // TODO Not yet implemented, needs some investigation how it is implemente din TGeant3 or TGeant4
      Warning("CurrentBoundaryNormal", "Not yet implemented");
      return kFALSE;
    }
@@ -835,9 +804,7 @@ class TMCReplay : public TVirtualMC
    //// Return the number of the current medium
    virtual Int_t CurrentMedium() const override
    {
-     Int_t mediumId;
-     getMediumId(fCurrentStep->volId, mediumId);
-     return mediumId;
+     return getMediumId(fCurrentStep->volId);
    }
                          // new function (to replace GetMedium() const)
 
@@ -1245,11 +1212,13 @@ class TMCReplay : public TVirtualMC
     TMCReplay& operator=(TMCReplay const&);
 
 
-    void getMediumId(int volId, int& mediumId) const;
+    int getMediumId(int volId) const;
 
-    void setCurrentCutsAndProcesses(int volId);
+    // load cuts and processes for volume ID
+    void loadCurrentCutsAndProcesses(int volId);
 
-    bool isPrimary(const o2::StepInfo& step) const;
+    // check whether step is primary
+    bool isPrimary(int trackId) const;
     bool keepDueToProcesses(const o2::StepInfo& step) const;
     bool keepDueToCuts(const o2::StepInfo& step) const;
     bool keepStep(const o2::StepInfo& step) const;
@@ -1342,6 +1311,7 @@ class TMCReplay : public TVirtualMC
     // local pointer to ROOT's geometry manager
     TGeoManager* fGeoManager;
 
+    ClassDefOverride(TMCReplay, 1);
 };
 
 #endif /* TMC_REPLAY_H */

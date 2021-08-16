@@ -21,6 +21,7 @@
 
 #include "TMCReplay/TMCReplay.h"
 
+ClassImp(TMCReplay);
 
 namespace vmcsl = o2::mcstepanalysis;
 
@@ -54,7 +55,6 @@ void TMCReplay::Init()
   // gGeoManager must be valid pointer now
   fGeoManager = gGeoManager;
 }
-
 
 
 Bool_t TMCReplay::GetTransformation(const TString& volumePath, TGeoHMatrix& matrix)
@@ -460,10 +460,9 @@ Int_t TMCReplay::VolDaughterCopyNo(const char* volName, Int_t i) const
 }
 
 
-bool TMCReplay::isPrimary(const o2::StepInfo& step) const
+bool TMCReplay::isPrimary(int trackId) const
 {
-  const auto& trackId = step.trackID;
-
+  // TODO These checks should't be necessary when dealing with a sane MCStepLogger file
   if(trackId > -1 && trackId < fCurrentLookups->tracktoparent.size()) {
     return fCurrentLookups->tracktoparent[trackId] < 0;
   }
@@ -471,9 +470,8 @@ bool TMCReplay::isPrimary(const o2::StepInfo& step) const
 }
 
 
-void TMCReplay::getMediumId(int volId, int& mediumId) const
+int TMCReplay::getMediumId(int volId) const
 {
-  mediumId = -1;
   if (volId > -1 && volId < fCurrentLookups->volidtomedium.size()) {
     if (fCurrentLookups->volidtomedium[volId] &&
         fCurrentLookups->volidtomedium[volId]->size() != 0) {
@@ -481,10 +479,11 @@ void TMCReplay::getMediumId(int volId, int& mediumId) const
       auto mediumName = *(fCurrentLookups->volidtomedium[volId]);
       auto medium = gGeoManager->GetMedium(mediumName.c_str());
       if(medium) {
-        mediumId = medium->GetId();
+        return medium->GetId();
       }
     }
   }
+  return -1;
 }
 
 Bool_t TMCReplay::SetProcess(const char* flagName, Int_t flagValue)
@@ -498,6 +497,53 @@ Bool_t TMCReplay::SetCut(const char* cutName, Double_t cutValue)
   return insertProcessOrCut(fCutsGlobal, physics::namesCuts, cutName, cutValue);
 }
 
+Int_t TMCReplay::CurrentVolID(Int_t& copyNo) const
+{
+  copyNo = fCurrentStep->copyNo;
+  return fCurrentStep->volId;
+}
+
+Int_t TMCReplay::CurrentVolOffID(Int_t off, Int_t& copyNo) const
+{
+  if (off < 0 || off > fGeoManager->GetLevel()) {
+    return 0;
+  }
+  if (off == 0) {
+    return CurrentVolID(copyNo);
+  }
+  TGeoNode* node = fGeoManager->GetMother(off);
+  if(!node) {
+    return 0;
+  }
+  copyNo = node->GetNumber();
+  return node->GetVolume()->GetNumber();
+}
+
+const char* TMCReplay::CurrentVolName() const
+{
+  return fCurrentLookups->volidtovolname[fCurrentStep->volId]->c_str();
+}
+
+
+const char* TMCReplay::CurrentVolOffName(Int_t off) const
+{
+  if(off < 0 || off > fGeoManager->GetLevel()) {
+    return 0;
+  }
+  if(off == 0) {
+    return CurrentVolName();
+  }
+  TGeoNode *node = fGeoManager->GetMother(off);
+  if(!node) {
+    return 0;
+  }
+  return node->GetVolume()->GetName();
+}
+
+const char* TMCReplay::CurrentVolPath()
+{
+  fGeoManager->GetPath();
+}
 
 void TMCReplay::Gstpar(Int_t itmed, const char *param, Double_t parval)
 {
@@ -508,14 +554,11 @@ void TMCReplay::Gstpar(Int_t itmed, const char *param, Double_t parval)
 }
 
 
-void TMCReplay::setCurrentCutsAndProcesses(int volId) {
-
-  // need to find the medium ID
-  int mediumId;
-  // reset the pointer
+void TMCReplay::loadCurrentCutsAndProcesses(int volId)
+{
   fcurrentProcesses = &fProcessesGlobal;
   fcurrentCuts = &fCutsGlobal;
-  getMediumId(volId, mediumId);
+  auto mediumId = getMediumId(volId);
   if(mediumId > -1) {
     if(fProcesses[mediumId]) {
       fcurrentProcesses = fProcesses[mediumId];
@@ -604,8 +647,10 @@ void TMCReplay::ProcessEvent(Int_t eventId)
 
     if(step.volId != previousVolId) {
       // find the correct set of cuts and processes for this volume
-      setCurrentCutsAndProcesses(step.volId);
+      loadCurrentCutsAndProcesses(step.volId);
       previousVolId = step.volId;
+      // TODO Can we find a cheaper way of doing that?
+      fGeoManager->FindNode(step.volId);
     }
 
     if(!keepStep(step)) {
@@ -631,17 +676,18 @@ void TMCReplay::ProcessEvent(Int_t eventId)
 
       currentTrackId = step.trackID;
       Int_t stackID = currentTrackId;
-      if(!isPrimary(step)) {
+      if(!isPrimary(currentTrackId)) {
         // If primary, it should have the same ID as during original simulation since primaries are always pushed at the beginning all at once. The same we do here (see above)
         fMCStack->PushTrack(0, fCurrentLookups->tracktoparent[step.trackID], fCurrentLookups->tracktopdg[step.trackID], -1., -1., -1.,
                             step.E, step.x, step.y, step.z, -1., -1., -1., -1., TMCProcess(step.prodprocess), stackID, 1., -1);
       }
+
       fMCStack->SetCurrentTrack(stackID);
 
       fApplication->PreTrack();
 
       currentIsPrimary = false;
-      if(isPrimary(step)) {
+      if(isPrimary(currentTrackId)) {
         fApplication->BeginPrimary();
         currentIsPrimary = true;
       }
