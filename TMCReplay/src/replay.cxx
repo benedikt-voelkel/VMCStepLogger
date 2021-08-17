@@ -6,7 +6,6 @@
 
 namespace bpo = boost::program_options;
 
-
 int main(int argc, char* argv[])
 {
   // prepare reading cmd options and store them
@@ -34,9 +33,9 @@ int main(int argc, char* argv[])
   const std::string geoFilename(vm["geofilename"].as<std::string>());
   const std::string geoKeyname(vm["geokeyname"].as<std::string>());
 
-  TMCReplayDummyStack stack;
-  TMCReplayDummyApplication app(geoFilename, geoKeyname);
-  TMCReplay mc(filename, treename);
+  tmcreplay::TMCReplayDummyStack stack;
+  tmcreplay::TMCReplayDummyApplication app(geoFilename, geoKeyname);
+  tmcreplay::TMCReplay mc(filename, treename);
   mc.SetStack(&stack);
   app.setStack(&stack);
   mc.Init();

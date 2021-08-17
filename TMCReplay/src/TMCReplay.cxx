@@ -24,6 +24,7 @@
 ClassImp(TMCReplay);
 
 namespace vmcsl = o2::mcstepanalysis;
+using namespace tmcreplay;
 
 TMCReplay::TMCReplay(const std::string& filename, const std::string& treename)
   : TVirtualMC("TMCReplay", "TMCReplay", kTRUE), fIsRootGeometrySupported(kTRUE),

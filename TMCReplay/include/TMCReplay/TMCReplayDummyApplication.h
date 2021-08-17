@@ -1,6 +1,5 @@
 // Some license stuff
 
-
 #ifndef TMC_REPLAY_DUMMY_APPLICATION_H
 #define TMC_REPLAY_DUMMY_APPLICATION_H
 
@@ -10,61 +9,65 @@
 
 class TGeoManager;
 
-
+namespace tmcreplay
+{
 class TMCReplayDummyStack;
+}
 
+namespace tmcreplay
+{
 // K is type of user kernel
 class TMCReplayDummyApplication : public TVirtualMCApplication
 {
 
-  public:
+ public:
+  TMCReplayDummyApplication(const std::string& geoFilename, const std::string& geoKeyname);
 
-    TMCReplayDummyApplication(const std::string& geoFilename, const std::string& geoKeyname);
+  /// For now just default destructor
+  virtual ~TMCReplayDummyApplication() = default;
 
-    /// For now just default destructor
-    virtual ~TMCReplayDummyApplication() = default;
+  // ConstructGeometry is the only implementation of a pure virtual method that does something at the moment
 
-    // ConstructGeometry is the only implementation of a pure virtual method that does something at the moment
+  virtual void ConstructGeometry() override;
 
-    virtual void ConstructGeometry() override;
+  // Implement all pure virtual methods, doing nothinig at the moment
 
-    // Implement all pure virtual methods, doing nothinig at the moment
+  virtual void InitGeometry() override { ; }
 
-    virtual void InitGeometry() override {;}
+  virtual void GeneratePrimaries() override { ; }
 
-    virtual void GeneratePrimaries() override {;}
+  virtual void BeginEvent() override;
 
-    virtual void BeginEvent() override;
+  virtual void BeginPrimary() override { ; }
 
-    virtual void BeginPrimary() override {;}
+  virtual void PreTrack() override { ; }
 
-    virtual void PreTrack() override {;}
+  virtual void Stepping() override
+  {
+    ;
+  }
 
-    virtual void Stepping() override
-    {;}
+  virtual void PostTrack() override { ; }
 
-    virtual void PostTrack() override {;}
+  virtual void FinishPrimary() override { ; }
 
-    virtual void FinishPrimary() override {;}
+  virtual void FinishEvent() override { ; }
 
-    virtual void FinishEvent() override {;}
+  void setStack(TMCReplayDummyStack* stack)
+  {
+    fStack = stack;
+  }
 
-    void setStack(TMCReplayDummyStack* stack)
-    {
-      fStack = stack;
-    }
-
-
-  private:
-    // Filename where geometry can be found
-    std::string fGeoFilename;
-    // Keyname under which geometry can be found inside the above file
-    std::string fGeoKeyname;
-    // local pointer to ROOT's geometry manager
-    TGeoManager* fGeoManager;
-    // stack
-    TMCReplayDummyStack* fStack;
-
+ private:
+  // Filename where geometry can be found
+  std::string fGeoFilename;
+  // Keyname under which geometry can be found inside the above file
+  std::string fGeoKeyname;
+  // local pointer to ROOT's geometry manager
+  TGeoManager* fGeoManager;
+  // stack
+  TMCReplayDummyStack* fStack;
 };
+} // end namespace tmcreplay
 
 #endif /* TMC_REPLAY_DUMMY_APPLICATION_H */

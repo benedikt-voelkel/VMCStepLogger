@@ -38,7 +38,6 @@ namespace mcstepanalysis
 // here we will give Step + meta info such as volumename, modulename, pdg
 typedef bool (*cut_function_type)(StepInfo const&, std::string const&, std::string const&, int, o2::StepLookups*);
 
-  
 // /class MCAnalysisManager;
 
 class MCAnalysis

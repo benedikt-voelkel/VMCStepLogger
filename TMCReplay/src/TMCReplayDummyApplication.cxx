@@ -5,6 +5,7 @@
 #include "TMCReplay/TMCReplayDummyStack.h"
 #include "TMCReplay/TMCReplayDummyApplication.h"
 
+using namespace tmcreplay;
 
 TMCReplayDummyApplication::TMCReplayDummyApplication(const std::string& geoFilename, const std::string& geoKeyname)
   : TVirtualMCApplication("TMCReplayDummyApplication", "TMCReplayDummyApplication"),

@@ -4,6 +4,7 @@
 
 #include "TMCReplay/TMCReplayDummyStack.h"
 
+using namespace tmcreplay;
 
 TMCReplayDummyStack::TMCReplayDummyStack()
   : TVirtualMCStack()
