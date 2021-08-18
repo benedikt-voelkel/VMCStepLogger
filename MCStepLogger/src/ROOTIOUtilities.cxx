@@ -98,8 +98,8 @@ void ROOTIOUtilities::close(bool finalAction)
 bool ROOTIOUtilities::changeToTDirectory(const std::string& dirname)
 {
   // if file not yet opened
-  if (!mTFileOpened) {
-    openTFile();
+  if (!mTFileOpened && !openTFile()) {
+    return false;
   }
   // if it was already opened, check if we are already in the desired directory
   else if (dirname.compare(mTDirectoryName) == 0) {

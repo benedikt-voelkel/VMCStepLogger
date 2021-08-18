@@ -11,13 +11,18 @@
 #include <iostream>
 #include <string>
 #include <vector>
+#include <array>
 #include <functional>
+#include <algorithm>
+#include <iterator>
 
 #include <boost/program_options.hpp>
 
 #include "TROOT.h"
 #include "TInterpreter.h"
 #include "TSystemDirectory.h"
+#include "TCanvas.h"
+#include "TLegend.h"
 
 #include "MCStepLogger/MCAnalysisManager.h"
 #include "MCStepLogger/MCAnalysisFileWrapper.h"
@@ -28,7 +33,7 @@ using namespace o2::mcstepanalysis;
 
 namespace bpo = boost::program_options;
 
-std::vector<std::string> availableCommands = { "analyze", "checkFile" };
+std::vector<std::string> availableCommands = { "analyze", "checkFile", "compareAnalyses" };
 
 // print help message
 void helpMessage(const bpo::options_description& desc)
@@ -143,15 +148,110 @@ int checkFile(const bpo::variables_map& vm, std::string& errorMessage)
   return 1;
 }
 
+
+template <typename T>
+void intersect(T& c1, T c2, T& cIntersection)
+{
+  std::sort(c1.begin(), c1.end());
+  std::sort(c2.begin(), c2.end());
+
+  cIntersection.clear();
+
+  std::set_intersection(c1.begin(), c1.end(), c2.begin(), c2.end(), std::back_inserter(cIntersection));
+}
+
+
+int compareAnalyses(const bpo::variables_map& vm, std::string& errorMessage)
+{
+  if(!vm.count("files")) {
+    errorMessage += "Input analysis files required\n";
+  }
+
+  if(!vm.count("output-dir")) {
+    errorMessage += "Output filename needs to be specified\n";
+  }
+
+  if (!errorMessage.empty()) {
+    return 1;
+  }
+
+  auto fileNames = vm["files"].as<std::vector<std::string>>();
+
+  std::vector<MCAnalysisFileWrapper> files(fileNames.size());
+  for(int i = 0; i < files.size(); i++) {
+    files[i].read(fileNames[i]);
+    if(!files[i].isSane()) {
+      errorMessage += "Found at least one analysis file (" + fileNames[i] + ") which seems to have a problem\n";
+      return 1;
+    }
+  }
+
+
+  // find common histograms by name
+  auto it = files.begin();
+
+  std::vector<std::string> intersection;
+  it->namesHistograms(intersection);
+  std::vector<std::string> current;
+
+  // Do with iterators cause we might just have one file
+  while(++it != files.end()) {
+    it->namesHistograms(current);
+    if(current.size() != intersection.size()) {
+      // found different number of histograms, should not be
+      errorMessage += "Histogram content differs\n";
+      return 1;
+    }
+    intersect(current, intersection, intersection);
+  }
+
+  constexpr std::array<int, 3> colors{634, 419, 602};
+  constexpr std::array<int, 3> linestyles{1, 7};
+  const std::string outputDir(vm["output-dir"].as<std::string>());
+
+  for(const auto& inter : intersection) {
+
+    TCanvas c(inter.c_str(), inter.c_str(), 600, 600);
+    TLegend l(0.6, 0.7, 0.89, 0.89);
+
+    c.cd();
+    for(int i = 0; i < files.size(); i++) {
+      auto& histo = files[i].getHistogram(inter);
+      histo.SetLineColor(colors[i%colors.size()]);
+      histo.SetLineStyle(linestyles[i%linestyles.size()]);
+      l.AddEntry(&histo, files[i].getAnalysisMetaInfo().label.c_str());
+      histo.Draw("same");
+    }
+    l.Draw();
+    std::string outputPath = outputDir + "/" + inter + ".eps";
+    c.SaveAs(outputPath.c_str());
+
+  }
+  return 0;
+}
+
 // Initialize everything for the final run depending on the command
 void initializeForRun(const std::string& cmd, bpo::options_description& cmdOptionsDescriptions, std::function<int(const bpo::variables_map&, std::string&)>& cmdFunction)
 {
   if (cmd == "analyze") {
-    cmdOptionsDescriptions.add_options()("help,h", "show this help message and exit")("analyses,a", bpo::value<std::vector<std::string>>()->multitoken(), "analyses to be run")("analysis-dir,d", bpo::value<std::string>(), "directory containing analysis macros (required, if --analyses is used)")("list-analyses,s", "list available analyses and exit")("root-file,f", bpo::value<std::string>(), "ROOT file from MCStepLogger to be analysed (required)")("label,l", bpo::value<std::string>(), "custom label for the analysis (required)")("output-dir,o", bpo::value<std::string>(), "output directory for analyses (required)")("number-events,n", bpo::value<int>()->default_value(-1), "only analyse a certain number of events");
+    cmdOptionsDescriptions.add_options()("help,h", "show this help message and exit")
+                                        ("analyses,a", bpo::value<std::vector<std::string>>()->multitoken(), "analyses to be run")
+                                        ("analysis-dir,d", bpo::value<std::string>(), "directory containing analysis macros (required, if --analyses is used)")
+                                        ("list-analyses,s", "list available analyses and exit")
+                                        ("root-file,f", bpo::value<std::string>(), "ROOT file from MCStepLogger to be analysed (required)")
+                                        ("label,l", bpo::value<std::string>(), "custom label for the analysis (required)")
+                                        ("output-dir,o", bpo::value<std::string>(), "output directory for analyses (required)")
+                                        ("number-events,n", bpo::value<int>()->default_value(-1), "only analyse a certain number of events");
     cmdFunction = analyze;
   } else if (cmd == "checkFile") {
-    cmdOptionsDescriptions.add_options()("help,h", "show this help message and exit")("root-file,f", bpo::value<std::string>(), "ROOT file to be checked");
+    cmdOptionsDescriptions.add_options()("help,h", "show this help message and exit")
+                                        ("root-file,f", bpo::value<std::string>(), "ROOT file to be checked");
     cmdFunction = checkFile;
+  } else if (cmd == "compareAnalyses") {
+    cmdOptionsDescriptions.add_options()("help,h", "show this help message and exit")
+                                        ("files,f", bpo::value<std::vector<std::string>>()->multitoken(), "analyses files to be compared")
+                                        ("output-dir,o", bpo::value<std::string>(), "output directory for comparison plots (required)");
+    cmdFunction = compareAnalyses;
   }
 }
 
@@ -161,7 +261,9 @@ int main(int argc, char* argv[])
   bpo::variables_map vm;
   // Description of the available top-level commands/options
   bpo::options_description desc("Available commands/options");
-  desc.add_options()("help,h", "show this help message and exit")("command", bpo::value<std::string>(), "command to be executed (\"analyze\", \"checkFile\"")("positional", bpo::value<std::vector<std::string>>(), "positional arguments");
+  desc.add_options()("help,h", "show this help message and exit")
+                    ("command", bpo::value<std::string>(), "command to be executed (\"analyze\", \"checkFile\", \"compareAnalyses\")")
+                    ("positional", bpo::value<std::vector<std::string>>(), "positional arguments");
   // Dedicated description for positional arguments
   bpo::positional_options_description pos;
   // First positional argument is actually the command, all others are real positional arguments "( "positional", -1 )"
@@ -206,11 +308,26 @@ int main(int argc, char* argv[])
   // initialize command function and corresponding options description
   initializeForRun(cmd, cmdOptionsDescriptions, cmdFunction);
   // Parse again to get positional arguments correctly labelled for analysis run
-  bpo::store(bpo::command_line_parser(opts).options(cmdOptionsDescriptions).run(), vm);
+  auto parsedSub = bpo::command_line_parser(opts).options(cmdOptionsDescriptions).allow_unregistered().run();
+  // collect all unknown positionals
+  auto unknownOpts = collect_unrecognized(parsedSub.options, bpo::include_positional);
+  if(!unknownOpts.empty()) {
+    std::cerr << "There were unrecognized options:\n";
+    for(auto& opt : unknownOpts) {
+      std::cerr << "  -> " << opt << "\n";
+    }
+    std::cerr << std::endl;
+    helpMessage(cmdOptionsDescriptions);
+    return 1;
+  }
+
+  // now that we sorted that one out...
+  bpo::store(parsedSub, vm);
+
   // Notify and fix variables map
   bpo::notify(vm);
   // To collect error messsages
-  std::string errorMessage("");
+  std::string errorMessage;
   if (vm.size() == 1) {
     errorMessage += "Options required...\n";
     returnValue = 1;
@@ -221,7 +338,7 @@ int main(int argc, char* argv[])
   }
   // check return value
   if (returnValue > 0) {
-    std::cerr << "ERRORS occured:";
+    std::cerr << "ERRORS occured:\n";
     std::cerr << errorMessage << "\n";
   }
   if (returnValue > 0 || vm.count("help")) {

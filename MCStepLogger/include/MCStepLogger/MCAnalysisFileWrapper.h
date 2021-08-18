@@ -122,6 +122,8 @@ class MCAnalysisFileWrapper
   MCAnalysisMetaInfo& getAnalysisMetaInfo();
   /// get number of histograms
   int nHistograms() const;
+  // get names of all histograms
+  void namesHistograms(std::vector<std::string>& names) const;
   //
   // verbosity
   //

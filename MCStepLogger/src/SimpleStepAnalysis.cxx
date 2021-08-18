@@ -117,11 +117,11 @@ void SimpleStepAnalysis::analyze(const std::vector<StepInfo>* const steps, const
   int nCutSteps = 0;
 
   int oldTrackID = -1; // to notice when a track changes
-  
+
   // loop over all steps in an event
   for (const auto& step : *steps) {
 
-    
+
     // prepare for PDG ids and volume names
     mAnalysisManager->getLookupPDG(step.trackID, pdgId);
     mAnalysisManager->getLookupVolName(step.volId, volName);
@@ -147,7 +147,7 @@ void SimpleStepAnalysis::analyze(const std::vector<StepInfo>* const steps, const
       steptree->Fill();
     }
 
-    auto pdgparticle = pdgdatabase->GetParticle(pdgId);    
+    auto pdgparticle = pdgdatabase->GetParticle(pdgId);
     std::string pdgasstring(pdgparticle? pdgparticle->GetName() : std::to_string(pdgId));
 
     if (newtrack) {
@@ -165,7 +165,7 @@ void SimpleStepAnalysis::analyze(const std::vector<StepInfo>* const steps, const
       histOriginPerMod->Fill(originModName.c_str(), 1);
       histOriginPerVol->Fill(originVolName.c_str(), 1);
     }
-    
+
     // record number of steps per module
     histNStepsPerMod->Fill(modName.c_str(), 1);
     // record number of steps per volume
@@ -187,29 +187,46 @@ void SimpleStepAnalysis::finalize()
   *histNStepsPerVolSorted = *histNStepsPerVol;
   histNStepsPerVolSorted->SetName("nStepsPerVolSorted");
   histNStepsPerVolSorted->LabelsOption(">", "X");
+  utilities::compressHistogram(histNStepsPerVolSorted);
+  utilities::compressHistogram(histNStepsPerVol);
+
 
   *histOriginPerVolSorted = *histOriginPerVol;
   histOriginPerVolSorted->SetName("OriginPerVolSorted");
   histOriginPerVolSorted->LabelsOption(">", "X");
-  histOriginPerVolSorted->SetBins(30, 0, 30);
+  //histOriginPerVolSorted->SetBins(30, 0, 30);
+  utilities::compressHistogram(histOriginPerVolSorted);
+  utilities::compressHistogram(histOriginPerVol);
+  utilities::compressHistogram(histOriginPerMod);
+
 
   std::cerr << "MOD have " << histNStepsPerMod->GetEntries() << " entries \n";
 
   *histTrackPDGSpectrumSorted = *histTrackPDGSpectrum;
   histTrackPDGSpectrumSorted->SetName("trackPDGSpectrumSorted");
   histTrackPDGSpectrumSorted->LabelsOption(">", "X");
-  histTrackPDGSpectrumSorted->SetBins(10,0,10);
-  
+  utilities::compressHistogram(histTrackPDGSpectrumSorted);
+  utilities::compressHistogram(histTrackPDGSpectrum);
+  //histTrackPDGSpectrumSorted->SetBins(10,0,10);
+
   // sortit
   // histNStepsPerVolSorted->LabelsOption(">", "X");
 
-  histNStepsPerVolSorted->SetBins(30, 0, 30);
-  histNStepsPerMod->LabelsOption(">", "X");
-  histNStepsPerMod->SetBins(30,0,30);
+  //histNStepsPerVolSorted->SetBins(30, 0, 30);
+  utilities::compressHistogram(histNStepsPerMod);
+  // histNStepsPerMod->LabelsOption(">", "X");
+  // histNStepsPerMod->SetBins(30,0,30);
 
-  histNSecondariesPerMod->LabelsOption(">", "X");
-  histNSecondariesPerVol->LabelsOption(">", "X");
-  histNSecondariesPerVol->SetBins(30,0,30);
+  utilities::compressHistogram(histNSecondariesPerMod);
+  utilities::compressHistogram(histNSecondariesPerVol);
+  utilities::compressHistogram(histNSecondariesPerPDG);
+  utilities::compressHistogram(histNStepsPerPDG);
+
+  // histNSecondariesPerMod->LabelsOption(">", "X");
+  // histNSecondariesPerVol->LabelsOption(">", "X");
+  // histNSecondariesPerVol->SetBins(30,0,30);
+
+  utilities::compressHistogram(histTrackProdProcess);
 
 
   if(getenv("KEEPSTEPS")) {

@@ -122,6 +122,14 @@ int MCAnalysisFileWrapper::nHistograms() const
   return mHistograms.size();
 }
 
+void MCAnalysisFileWrapper::namesHistograms(std::vector<std::string>& names) const
+{
+  names.resize(mHistograms.size());
+  for(int i = 0; i < mHistograms.size(); i++) {
+    names[i] = mHistograms[i]->GetName();
+  }
+}
+
 void MCAnalysisFileWrapper::printAnalysisMetaInfo() const
 {
   std::cerr << "INFO: Meta info of analysis file\n";
