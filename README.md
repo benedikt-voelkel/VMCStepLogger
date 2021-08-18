@@ -297,3 +297,6 @@ where now
 * `-d $ANALYSIS_MACROS` points the executable to the directory of where your macros are located
 * `-a  mySimulationAnalysis` tells which analysis to load. In case you have more analyses in that directory you want to load, just append the names of all analyses you want to run.
 The output of the custom analysis is written to `parent/output/dir/mySimulationAnalysis/` and that's it.
+
+### Comparing analysis output
+**Not yet implemented**
