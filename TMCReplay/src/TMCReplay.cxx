@@ -21,7 +21,7 @@
 
 #include "TMCReplay/TMCReplay.h"
 
-ClassImp(TMCReplay);
+ClassImp(tmcreplay::TMCReplay);
 
 namespace vmcsl = o2::mcstepanalysis;
 using namespace tmcreplay;
@@ -31,7 +31,8 @@ TMCReplay::TMCReplay(const std::string& filename, const std::string& treename)
     fIsRunStopped(kFALSE), fIsEventStopped(kFALSE), fIsTrackStopped(kFALSE),
     fFilename(filename), fTreename(treename),
     fCurrentStepInfo(nullptr), fCurrentMagCallInfo(nullptr), fCurrentLookups(nullptr),
-    fCurrentEvent(0), fCurrentStep(nullptr), fProcessesGlobal(physics::namesProcesses.size(), -1),
+    fCurrentEvent(0), fCurrentStep(nullptr), fCurrentTrackLength(0.),
+    fProcessesGlobal(physics::namesProcesses.size(), -1),
     fCutsGlobal(physics::namesCuts.size(), -1.), fcurrentProcesses(nullptr), fcurrentCuts(nullptr),
     fGeoManager(nullptr)
 {}
@@ -543,7 +544,7 @@ const char* TMCReplay::CurrentVolOffName(Int_t off) const
 
 const char* TMCReplay::CurrentVolPath()
 {
-  fGeoManager->GetPath();
+  return fGeoManager->GetPath();
 }
 
 void TMCReplay::Gstpar(Int_t itmed, const char *param, Double_t parval)
@@ -607,25 +608,24 @@ void TMCReplay::ProcessEvent(Int_t eventId)
 
   fApplication->BeginEvent();
 
-
-  std::string mediumName;
-  int skipTrackId = -1;
+  std::vector<bool> skipTrack(fCurrentLookups->tracktopdg.size(), false);
   int currentTrackId = -1;
   bool currentIsPrimary = false;
   int previousVolId = -1;
-  std::vector<int> skipChildrenWithParent;
-
+  // If we replay and in particular when certain tracks are killed during replay we have to make sure to obay the indexing og the user's stack
+  std::vector<int> userTrackId(fCurrentLookups->tracktopdg.size(), -1);
 
   // push all primaries already to be consistent with VMC behaviour
   for(auto& step : *fCurrentStepInfo) {
+    // by default just assign the previous track ID, the stack might then decide to do something else
+    userTrackId[step.trackID] = step.trackID;
     if(step.newtrack && fCurrentLookups->tracktoparent[step.trackID] < 0) {
       fMCStack->PushTrack(0, -1, fCurrentLookups->tracktopdg[step.trackID], -1., -1., -1.,
-        step.E, step.x, step.y, step.z, -1., -1., -1., -1., TMCProcess(step.prodprocess), currentTrackId, 1., -1);
+        step.E, step.x, step.y, step.z, -1., -1., -1., -1., TMCProcess(step.prodprocess), userTrackId[step.trackID], 1., -1);
     }
   }
-  currentTrackId = -1;
 
-  for(auto& step : *fCurrentStepInfo) {
+  for(const auto& step : *fCurrentStepInfo) {
     // loop over all steps of one event
 
     if(fIsEventStopped) {
@@ -633,18 +633,15 @@ void TMCReplay::ProcessEvent(Int_t eventId)
       return;
     }
 
-    if(fIsTrackStopped) {
-      skipTrackId = step.trackID;
-    }
-
-    if(skipTrackId == step.trackID || std::find(skipChildrenWithParent.begin(), skipChildrenWithParent.end(), fCurrentLookups->tracktoparent[step.trackID]) != skipChildrenWithParent.end()) {
-      // skip if that was flagged
-      // skip also if parent was killed, TODO maybe find more efficient solution for that condition
-      if(skipChildrenWithParent.back() != step.trackID) {
-        skipChildrenWithParent.push_back(step.trackID);
-      }
+    if(fIsTrackStopped || skipTrack[step.trackID] || (fCurrentLookups->tracktoparent[step.trackID] > -1 && skipTrack[fCurrentLookups->tracktoparent[step.trackID]]) || !keepStep(step)) {
+      // even if that track is not flagged to be skipped, the parent track might be, so set it to true also in that case to recursively guarantee that we skip the whole history of a killed track.
+      // In that case, this is a child track being a potential parent to other tracks which must not be transported.
+      skipTrack[step.trackID] = true;
       continue;
     }
+
+    // Set this before any method from the application is called
+    fCurrentStep = const_cast<o2::StepInfo*>(&step);
 
     if(step.volId != previousVolId) {
       // find the correct set of cuts and processes for this volume
@@ -653,16 +650,6 @@ void TMCReplay::ProcessEvent(Int_t eventId)
       // TODO Can we find a cheaper way of doing that?
       fGeoManager->FindNode(step.volId);
     }
-
-    if(!keepStep(step)) {
-      // killing a step implies killing the entire track ==> flag this track to be skipped
-      skipTrackId = step.trackID;
-      skipChildrenWithParent.push_back(skipTrackId);
-      continue;
-    }
-
-    // Set this before any method from the application is called
-    fCurrentStep = &step;
 
     if(currentTrackId != step.trackID) {
 
@@ -674,16 +661,20 @@ void TMCReplay::ProcessEvent(Int_t eventId)
         fApplication->PostTrack();
       }
       fIsTrackStopped = kFALSE;
+      fCurrentTrackLength = 0.;
 
       currentTrackId = step.trackID;
-      Int_t stackID = currentTrackId;
+      // If primary, it should have the same ID as during original simulation since primaries are always pushed at the beginning all at once. The same we do here (see above)
       if(!isPrimary(currentTrackId)) {
-        // If primary, it should have the same ID as during original simulation since primaries are always pushed at the beginning all at once. The same we do here (see above)
-        fMCStack->PushTrack(0, fCurrentLookups->tracktoparent[step.trackID], fCurrentLookups->tracktopdg[step.trackID], -1., -1., -1.,
-                            step.E, step.x, step.y, step.z, -1., -1., -1., -1., TMCProcess(step.prodprocess), stackID, 1., -1);
+        // by default just assign the previous track ID, the stack might then decide to do something else
+        // here we need also be careful to set the correct parent comlying with the user stack indexing
+        userTrackId[step.trackID] = step.trackID;
+        fMCStack->PushTrack(0, userTrackId[fCurrentLookups->tracktoparent[step.trackID]], fCurrentLookups->tracktopdg[step.trackID], -1., -1., -1.,
+                            step.E, step.x, step.y, step.z, -1., -1., -1., -1., TMCProcess(step.prodprocess), userTrackId[step.trackID], 1., -1);
       }
 
-      fMCStack->SetCurrentTrack(stackID);
+      // Need to set from the mapped user track ID because we don't know the internals of the indexing of that stack but we have to comply with it
+      fMCStack->SetCurrentTrack(userTrackId[step.trackID]);
 
       fApplication->PreTrack();
 
@@ -693,6 +684,10 @@ void TMCReplay::ProcessEvent(Int_t eventId)
         currentIsPrimary = true;
       }
     }
+
+    // TODO That seems to be the correct way of implementing.
+    // However, should we do it before or after calling VMC::Stepping?
+    fCurrentTrackLength += step.step;
 
     // TODO Maybe needed to find out which hit logic is used now by O2?!
     fApplication->Stepping();

@@ -897,8 +897,6 @@ class TMCReplay : public TVirtualMC
   /// currently being transported
   virtual void TrackMomentum(TLorentzVector& momentum) const override
   {
-    // TODO momenta not yet implmnted
-    // TODO make sure E is actually the energy and NOT the energy deposit
     momentum.SetXYZT(fCurrentStep->px, fCurrentStep->py, fCurrentStep->pz, fCurrentStep->E);
   }
 
@@ -906,11 +904,9 @@ class TMCReplay : public TVirtualMC
   /// currently being transported (as double)
   virtual void TrackMomentum(Double_t& px, Double_t& py, Double_t& pz, Double_t& etot) const override
   {
-    // TODO momenta not yet implmnted
     px = fCurrentStep->px;
     py = fCurrentStep->py;
     pz = fCurrentStep->pz;
-    // TODO make sure E is actually the energy and NOT the energy deposit
     etot = fCurrentStep->E;
   }
 
@@ -918,26 +914,22 @@ class TMCReplay : public TVirtualMC
   /// currently being transported (as float)
   virtual void TrackMomentum(Float_t& px, Float_t& py, Float_t& pz, Float_t& etot) const override
   {
-    // TODO momenta not yet implmnted
     px = fCurrentStep->px;
     py = fCurrentStep->py;
     pz = fCurrentStep->pz;
-    // TODO make sure E is actually the energy and NOT the energy deposit
     etot = fCurrentStep->E;
   }
 
   /// Return the length in centimeters of the current step (in cm)
   virtual Double_t TrackStep() const override
   {
-    // TODO Check if that is actually the step length
     return fCurrentStep->step;
   }
 
   /// Return the length of the current track from its origin (in cm)
   virtual Double_t TrackLength() const override
   {
-    // TODO Check if that is actually the step length
-    return fCurrentStep->step;
+    return fCurrentTrackLength;
   }
 
   /// Return the current time of flight of the track being transported
@@ -1277,6 +1269,9 @@ class TMCReplay : public TVirtualMC
 
   // the current step
   o2::StepInfo* fCurrentStep;
+
+  // increment the current track length
+  double fCurrentTrackLength;
 
   // Preliminary process structure
   std::vector<std::vector<Int_t>*> fProcesses;

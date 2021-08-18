@@ -28,6 +28,9 @@ class TVirtualMagField;
 
 DECLARE_INTERCEPT_SYMBOLS(FairMCApplication)
 DECLARE_INTERCEPT_SYMBOLS(AliMC)
+namespace tmcreplay {
+  DECLARE_INTERCEPT_SYMBOLS(TMCReplayDummyApplication)
+}
 
 // same for field
 #define DECLARE_INTERCEPT_FIELD_SYMBOLS(FIELD)       \
@@ -82,12 +85,15 @@ extern "C" void initLogger();
 // the runtime will now dispatch to these functions due to LD_PRELOAD
 INTERCEPT_STEPPING(FairMCApplication, "libBase", "_ZN17FairMCApplication8SteppingEv")
 INTERCEPT_STEPPING(AliMC, "libSTEER", "_ZN5AliMC8SteppingEv")
+INTERCEPT_STEPPING(tmcreplay::TMCReplayDummyApplication, "libTMCReplay", "_ZN9tmcreplay25TMCReplayDummyApplication8SteppingEv")
 
 INTERCEPT_FINISHEVENT(FairMCApplication, "libBase", "_ZN17FairMCApplication11FinishEventEv")
 INTERCEPT_FINISHEVENT(AliMC, "libSTEER", "_ZN5AliMC11FinishEventEv")
+INTERCEPT_FINISHEVENT(tmcreplay::TMCReplayDummyApplication, "libTMCReplay", "_ZN9tmcreplay25TMCReplayDummyApplication11FinishEventEv")
 
 INTERCEPT_GEOMETRYINIT(FairMCApplication, "libBase", "_ZN17FairMCApplication17ConstructGeometryEv")
 INTERCEPT_GEOMETRYINIT(AliMC, "libSTEER", "_ZN5AliMC17ConstructGeometryEv")
+INTERCEPT_GEOMETRYINIT(tmcreplay::TMCReplayDummyApplication, "libTMCReplay", "_ZN9tmcreplay25TMCReplayDummyApplication17ConstructGeometryEv")
 
 #define INTERCEPT_FIELD(FIELD, LIB, SYMBOL)                     \
   void FIELD::Field(const double* point, double* bField)        \

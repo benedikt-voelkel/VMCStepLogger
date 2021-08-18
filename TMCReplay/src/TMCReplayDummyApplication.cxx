@@ -5,6 +5,8 @@
 #include "TMCReplay/TMCReplayDummyStack.h"
 #include "TMCReplay/TMCReplayDummyApplication.h"
 
+ClassImp(tmcreplay::TMCReplayDummyApplication);
+
 using namespace tmcreplay;
 
 TMCReplayDummyApplication::TMCReplayDummyApplication(const std::string& geoFilename, const std::string& geoKeyname)

@@ -73,6 +73,7 @@ class TMCReplayDummyStack : public TVirtualMCStack
 
  private:
   void clear();
+  void insertParticle(TParticle* particle, int id);
 
  private:
   // current track ID
@@ -86,6 +87,8 @@ class TMCReplayDummyStack : public TVirtualMCStack
   // all particles ever pushed
   // TODO we can make that unique_ptrs?!
   std::vector<TParticle*> fParticles;
+
+  ClassDefOverride(TMCReplayDummyStack, 1);
 };
 } // end namespace tmcreplay
 

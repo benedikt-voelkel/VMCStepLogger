@@ -67,6 +67,8 @@ class TMCReplayDummyApplication : public TVirtualMCApplication
   TGeoManager* fGeoManager;
   // stack
   TMCReplayDummyStack* fStack;
+
+  ClassDefOverride(TMCReplayDummyApplication, 1);
 };
 } // end namespace tmcreplay
 
