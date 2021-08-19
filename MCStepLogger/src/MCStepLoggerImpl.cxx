@@ -14,7 +14,7 @@
 //  @brief  A logging service for MCSteps (hooking into Stepping of TVirtualMCApplication's)
 
 #include "MCStepLogger/StepInfo.h"
-#include "MCStepLogger/MetaInfo.h"
+#include "MCStepLogger/MCStepLoggerIntercept.h"
 #include <TBranch.h>
 #include <TClonesArray.h>
 #include <TFile.h>
@@ -25,18 +25,11 @@
 #include <TVirtualMCApplication.h>
 #include <TVirtualMagField.h>
 #include <sstream>
-
-#include <dlfcn.h>
-#include <cstdlib>
 #include <fstream>
-#include <iostream>
-#include <map>
-#include <set>
-#include <sstream>
+
 #ifdef NDEBUG
 #undef NDEBUG
 #endif
-#include <cassert>
 
 namespace o2
 {
@@ -336,57 +329,11 @@ StepLogger* logger;
 FieldLogger* fieldlogger;
 } // end namespace
 
-// a helper template kernel describing generically the redispatching prodecure
-template <typename Object /* the original object type */, typename MethodType /* member function type */,
-          typename... Args /* original arguments to function */>
-void dispatchOriginalKernel(Object* obj, char const* libname, char const* origFunctionName, Args... args)
-{
-  // Object, MethodType, and Args are of course related so we could do some static_assert checks or automatic deduction
-
-  // static map to avoid having to lookup the right symbols in the shared lib at each call
-  // (We could do this outside of course)
-  static std::map<const char*, MethodType> functionNameToSymbolMap;
-  MethodType origMethod = nullptr;
-
-  auto iter = functionNameToSymbolMap.find(origFunctionName);
-  if (iter == functionNameToSymbolMap.end()) {
-    auto libHandle = dlopen(libname, RTLD_NOW);
-    // try to make the library loading a bit more portable:
-    if (!libHandle) {
-      // try appending *.so
-      std::stringstream stream;
-      stream << libname << ".so";
-      libHandle = dlopen(stream.str().c_str(), RTLD_NOW);
-    }
-    if (!libHandle) {
-      // try appending *.dylib
-      std::stringstream stream;
-      stream << libname << ".dylib";
-      libHandle = dlopen(stream.str().c_str(), RTLD_NOW);
-    }
-    assert(libHandle);
-    void* symbolAddress = dlsym(libHandle, origFunctionName);
-    assert(symbolAddress);
-// Purposely ignore compiler warning
-#pragma GCC diagnostic push
-#pragma GCC diagnostic ignored "-Wsizeof-pointer-memaccess"
-    // hack since C++ does not allow casting to C++ member function pointers
-    // thanks to gist.github.com/mooware/1174572
-    memcpy(&origMethod, &symbolAddress, sizeof(&symbolAddress));
-#pragma GCC diagnostic pop
-    functionNameToSymbolMap[origFunctionName] = origMethod;
-  } else {
-    origMethod = iter->second;
-  }
-  // the final C++ member function call redispatch
-  (obj->*origMethod)(args...);
-}
-
 // a generic function that can dispatch to the original method of a TVirtualMCApplication
 extern "C" void dispatchOriginal(TVirtualMCApplication* app, char const* libname, char const* origFunctionName)
 {
   typedef void (TVirtualMCApplication::*StepMethodType)();
-  dispatchOriginalKernel<TVirtualMCApplication, StepMethodType>(app, libname, origFunctionName);
+  o2::mcsteploggerintercept::dispatchOriginalKernel<TVirtualMCApplication, StepMethodType>(app, libname, origFunctionName);
 }
 
 // a generic function that can dispatch to the original method of a TVirtualMagField
@@ -394,7 +341,7 @@ extern "C" void dispatchOriginalField(TVirtualMagField* field, char const* libna
                                       const double x[3], double* B)
 {
   typedef void (TVirtualMagField::*MethodType)(const double[3], double*);
-  dispatchOriginalKernel<TVirtualMagField, MethodType>(field, libname, origFunctionName, x, B);
+  o2::mcsteploggerintercept::dispatchOriginalKernel<TVirtualMagField, MethodType>(field, libname, origFunctionName, x, B);
 }
 
 extern "C" void performLogging(TVirtualMCApplication* app)

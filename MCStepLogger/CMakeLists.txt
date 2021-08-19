@@ -30,9 +30,14 @@ set(SRCS_CORE
     ${IMP_SRC_DIR}/StepInfo.cxx
    )
 
-set(SRCS_INTERCEPT
+set(SRCS_INTERCEPT_STEPS
     ${IMP_SRC_DIR}/MCStepInterceptor.cxx
     ${IMP_SRC_DIR}/MCStepLoggerImpl.cxx
+   )
+
+set(SRCS_INTERCEPT_TIME
+    ${IMP_SRC_DIR}/MCTimeInterceptor.cxx
+    ${IMP_SRC_DIR}/MCStepLoggerTimerImpl.cxx
    )
 
 set(SRCS_ANALYSIS
@@ -51,7 +56,10 @@ set(HEADERS_CORE
    ${INC_SRC_DIR}/MetaInfo.h
   )
 
-set(HEADERS_INTERCEPT
+set(HEADERS_INTERCEPT_STEPS
+  )
+
+set(HEADERS_INTERCEPT_TIME
   )
 
 set(HEADERS_ANALYSIS
@@ -100,24 +108,45 @@ set_target_properties(${lib_core} PROPERTIES INTERFACE_LINK_LIBRARIES "${LIB_DEP
 target_include_directories(${lib_core} INTERFACE $<INSTALL_INTERFACE:include>)
 
 
-#########################
-# Add intercept library #
-#########################
-set(lib_intercept "${LIBRARY_NAME}Intercept")
+###################################
+# Add intercept library for steps #
+###################################
+set(lib_intercept_steps "${LIBRARY_NAME}InterceptSteps")
 
 # Generate ROOT dictionary
-SET(ROOT_DICT_LINKDEF_FILE_INTERCEPT "${IMP_SRC_DIR}/${lib_intercept}LinkDef.h")
-SET(ROOT_DICT_NAME_INTERCEPT "G__${lib_intercept}")
-ROOT_GENERATE_DICTIONARY(${ROOT_DICT_NAME_INTERCEPT} ${HEADERS_INTERCEPT} LINKDEF ${ROOT_DICT_LINKDEF_FILE_INTERCEPT})
+SET(ROOT_DICT_LINKDEF_FILE_INTERCEPT_STEPS "${IMP_SRC_DIR}/${lib_intercept_steps}LinkDef.h")
+SET(ROOT_DICT_NAME_INTERCEPT_STEPS "G__${lib_intercept_steps}")
+ROOT_GENERATE_DICTIONARY(${ROOT_DICT_NAME_INTERCEPT_STEPS} ${HEADERS_INTERCEPT_STEPS} LINKDEF ${ROOT_DICT_LINKDEF_FILE_INTERCEPT_STEPS})
 # Files produced by the dictionary generation
-SET(ROOT_DICT_LIB_FILES_INTERCEPT
-    "${PROJECT_BINARY_DIR}/lib${lib_intercept}_rdict.pcm"
-    "${PROJECT_BINARY_DIR}/lib${lib_intercept}.rootmap")
+SET(ROOT_DICT_LIB_FILES_INTERCEPT_STEPS
+    "${PROJECT_BINARY_DIR}/lib${lib_intercept_steps}_rdict.pcm"
+  "${PROJECT_BINARY_DIR}/lib${lib_intercept_steps}.rootmap")
 
-add_library(${lib_intercept} SHARED ${SRCS_INTERCEPT} "${ROOT_DICT_NAME_INTERCEPT}.cxx")
-target_link_libraries(${lib_intercept} ${lib_core})
-set_target_properties(${lib_intercept} PROPERTIES INTERFACE_LINK_LIBRARIES "${lib_core}")
-target_include_directories(${lib_intercept} INTERFACE $<INSTALL_INTERFACE:include>)
+add_library(${lib_intercept_steps} SHARED ${SRCS_INTERCEPT_STEPS} "${ROOT_DICT_NAME_INTERCEPT_STEPS}.cxx")
+target_link_libraries(${lib_intercept_steps} ${lib_core})
+set_target_properties(${lib_intercept_steps} PROPERTIES INTERFACE_LINK_LIBRARIES "${lib_core}")
+target_include_directories(${lib_intercept_steps} INTERFACE $<INSTALL_INTERFACE:include>)
+
+##########################################
+# Add intercept library for event timing #
+##########################################
+set(lib_intercept_time "${LIBRARY_NAME}InterceptTime")
+
+# Generate ROOT dictionary
+SET(ROOT_DICT_LINKDEF_FILE_INTERCEPT_TIME "${IMP_SRC_DIR}/${lib_intercept_time}LinkDef.h")
+SET(ROOT_DICT_NAME_INTERCEPT_TIME "G__${lib_intercept_time}")
+ROOT_GENERATE_DICTIONARY(${ROOT_DICT_NAME_INTERCEPT_TIME} ${HEADERS_INTERCEPT_TIME} LINKDEF ${ROOT_DICT_LINKDEF_FILE_INTERCEPT_TIME})
+# Files produced by the dictionary generation
+SET(ROOT_DICT_LIB_FILES_INTERCEPT_TIME
+    "${PROJECT_BINARY_DIR}/lib${lib_intercept_time}_rdict.pcm"
+  "${PROJECT_BINARY_DIR}/lib${lib_intercept_time}.rootmap")
+
+add_library(${lib_intercept_time} SHARED ${SRCS_INTERCEPT_TIME} "${ROOT_DICT_NAME_INTERCEPT_TIME}.cxx")
+# TODO remove dependency on lib_core
+target_link_libraries(${lib_intercept_time} ${lib_core})
+set_target_properties(${lib_intercept_time} PROPERTIES INTERFACE_LINK_LIBRARIES "${lib_core}")
+target_include_directories(${lib_intercept_time} INTERFACE $<INSTALL_INTERFACE:include>)
+
 
 ########################
 # Add analysis library #
@@ -144,12 +173,14 @@ install(FILES ${HEADERS_CORE} ${HEADERS_INTERCEPT} ${HEADERS_ANALYSIS} DESTINATI
 
 # Install libraries (and add to export such that we can easily find its dependencies later)
 install(TARGETS ${lib_core} DESTINATION ${INSTALL_LIB_DIR} EXPORT ${CMAKE_PROJECT_NAME}Exports)
-install(TARGETS ${lib_intercept} DESTINATION ${INSTALL_LIB_DIR} EXPORT ${CMAKE_PROJECT_NAME}Exports)
+install(TARGETS ${lib_intercept_steps} DESTINATION ${INSTALL_LIB_DIR} EXPORT ${CMAKE_PROJECT_NAME}Exports)
+install(TARGETS ${lib_intercept_time} DESTINATION ${INSTALL_LIB_DIR} EXPORT ${CMAKE_PROJECT_NAME}Exports)
 install(TARGETS ${lib_analysis} DESTINATION ${INSTALL_LIB_DIR} EXPORT ${CMAKE_PROJECT_NAME}Exports)
 
 # Install the ROOT dictionary files
 install(FILES ${ROOT_DICT_LIB_FILES_CORE} DESTINATION ${INSTALL_LIB_DIR})
-install(FILES ${ROOT_DICT_LIB_FILES_INTERCEPT} DESTINATION ${INSTALL_LIB_DIR})
+install(FILES ${ROOT_DICT_LIB_FILES_INTERCEPT_STEPS} DESTINATION ${INSTALL_LIB_DIR})
+install(FILES ${ROOT_DICT_LIB_FILES_INTERCEPT_TIME} DESTINATION ${INSTALL_LIB_DIR})
 install(FILES ${ROOT_DICT_LIB_FILES_ANALYSIS} DESTINATION ${INSTALL_LIB_DIR})
 
 # Install executables (and add to export such that we can easily find its dependencies later)
@@ -158,4 +189,4 @@ target_link_libraries(${EXECUTABLE_NAME} ${lib_core} ${lib_analysis} Boost::prog
 install(TARGETS ${EXECUTABLE_NAME} DESTINATION ${INSTALL_BIN_DIR} EXPORT ${CMAKE_PROJECT_NAME}Exports)
 
 # Install macros
-install(FILES ${MACROS} DESTINATION ${INSTALL_MACRO_DIR})
+install(FILES ${MACROS} DESTINATION ${INSTALL_MACRO_DIR}) 

@@ -13,21 +13,18 @@
 #include <vector>
 #include <array>
 #include <functional>
-#include <algorithm>
-#include <iterator>
 
 #include <boost/program_options.hpp>
 
 #include "TROOT.h"
 #include "TInterpreter.h"
 #include "TSystemDirectory.h"
-#include "TCanvas.h"
-#include "TLegend.h"
 
 #include "MCStepLogger/MCAnalysisManager.h"
 #include "MCStepLogger/MCAnalysisFileWrapper.h"
 #include "MCStepLogger/BasicMCAnalysis.h"
 #include "MCStepLogger/SimpleStepAnalysis.h"
+#include "MCStepLogger/MCAnalysisUtilities.h"
 
 using namespace o2::mcstepanalysis;
 
@@ -144,20 +141,8 @@ int checkFile(const bpo::variables_map& vm, std::string& errorMessage)
   if (anamgr.dryrun()) {
     return 0;
   }
-  std::cerr << "ERROR: This ROOT file is neither an MCStepLogger nor an MCAnalysis file.\n";
+  errorMessage += "This ROOT file is neither an MCStepLogger nor an MCAnalysis file.\n";
   return 1;
-}
-
-
-template <typename T>
-void intersect(T& c1, T c2, T& cIntersection)
-{
-  std::sort(c1.begin(), c1.end());
-  std::sort(c2.begin(), c2.end());
-
-  cIntersection.clear();
-
-  std::set_intersection(c1.begin(), c1.end(), c2.begin(), c2.end(), std::back_inserter(cIntersection));
 }
 
 
@@ -175,58 +160,13 @@ int compareAnalyses(const bpo::variables_map& vm, std::string& errorMessage)
     return 1;
   }
 
-  auto fileNames = vm["files"].as<std::vector<std::string>>();
-
-  std::vector<MCAnalysisFileWrapper> files(fileNames.size());
-  for(int i = 0; i < files.size(); i++) {
-    files[i].read(fileNames[i]);
-    if(!files[i].isSane()) {
-      errorMessage += "Found at least one analysis file (" + fileNames[i] + ") which seems to have a problem\n";
-      return 1;
-    }
-  }
-
-
-  // find common histograms by name
-  auto it = files.begin();
-
-  std::vector<std::string> intersection;
-  it->namesHistograms(intersection);
-  std::vector<std::string> current;
-
-  // Do with iterators cause we might just have one file
-  while(++it != files.end()) {
-    it->namesHistograms(current);
-    if(current.size() != intersection.size()) {
-      // found different number of histograms, should not be
-      errorMessage += "Histogram content differs\n";
-      return 1;
-    }
-    intersect(current, intersection, intersection);
-  }
-
-  constexpr std::array<int, 3> colors{634, 419, 602};
-  constexpr std::array<int, 3> linestyles{1, 7};
+  auto filePaths = vm["files"].as<std::vector<std::string>>();
   const std::string outputDir(vm["output-dir"].as<std::string>());
 
-  for(const auto& inter : intersection) {
-
-    TCanvas c(inter.c_str(), inter.c_str(), 600, 600);
-    TLegend l(0.6, 0.7, 0.89, 0.89);
-
-    c.cd();
-    for(int i = 0; i < files.size(); i++) {
-      auto& histo = files[i].getHistogram(inter);
-      histo.SetLineColor(colors[i%colors.size()]);
-      histo.SetLineStyle(linestyles[i%linestyles.size()]);
-      l.AddEntry(&histo, files[i].getAnalysisMetaInfo().label.c_str());
-      histo.Draw("same");
-    }
-    l.Draw();
-    std::string outputPath = outputDir + "/" + inter + ".eps";
-    c.SaveAs(outputPath.c_str());
-
+  if(!utilities::drawCompare(filePaths, outputDir)) {
+    return 1;
   }
+
   return 0;
 }
 
