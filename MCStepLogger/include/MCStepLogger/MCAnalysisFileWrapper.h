@@ -131,8 +131,6 @@ class MCAnalysisFileWrapper
   void printAnalysisMetaInfo() const;
   // print histogram names, available options are "base", "range", "all". For more information see documenation of TH1::Print()
   void printHistogramInfo(const std::string& option = "") const;
-  /// check for and create a directory
-  static bool createDirectory(const std::string& dir);
 
  private:
   /// convert between histogram types, accept/don't accept a nullptr as argument

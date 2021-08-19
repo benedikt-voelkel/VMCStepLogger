@@ -41,8 +41,6 @@ struct MCAnalysisMetaInfo {
   }
   /// name of the analysis
   std::string analysisName;
-  /// analysis version (from ROOT's TSreamerInfo)
-  int analysisVersion;
   /// provide number of histograms for later sanity check
   int nHistograms;
   /// label, also shown in plots, especially useful for comparison plots
@@ -51,7 +49,6 @@ struct MCAnalysisMetaInfo {
   void print() const
   {
     std::cout << "Analysis name: " << analysisName << "\n"
-              << "Analysis version " << analysisVersion << "\n"
               << "Label " << label << "\n";
   }
 

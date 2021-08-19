@@ -14,6 +14,7 @@
 
 #include "MCStepLogger/MCAnalysisFileWrapper.h"
 #include "MCStepLogger/ROOTIOUtilities.h"
+#include "MCStepLogger/MCAnalysisUtilities.h"
 
 ClassImp(o2::mcstepanalysis::MCAnalysisFileWrapper);
 
@@ -75,7 +76,7 @@ void MCAnalysisFileWrapper::write(const std::string& filedir) const
     return;
   }
   const std::string outputDir = filedir + "/" + mAnalysisMetaInfo.analysisName;
-  if (!createDirectory(outputDir)) {
+  if (!utilities::createDirectory(outputDir)) {
     std::cerr << "ERROR: Directory " << outputDir << " could not be created for analysis " << mAnalysisMetaInfo.analysisName << ". Skip...\n";
     return;
   }
@@ -103,13 +104,6 @@ TH1* MCAnalysisFileWrapper::findHistogram(const std::string& name)
 bool MCAnalysisFileWrapper::hasHistogram(const std::string& name)
 {
   return (findHistogram(name) != nullptr);
-}
-
-bool MCAnalysisFileWrapper::createDirectory(const std::string& dir)
-{
-  gSystem->mkdir(dir.c_str(), true);
-  // according to documentation returns false if possible to access
-  return (gSystem->AccessPathName(dir.c_str()) == 0);
 }
 
 MCAnalysisMetaInfo& MCAnalysisFileWrapper::getAnalysisMetaInfo()

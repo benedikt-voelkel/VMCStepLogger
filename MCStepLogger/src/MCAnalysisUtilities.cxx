@@ -8,6 +8,7 @@
 // granted to it by virtue of its status as an Intergovernmental Organization
 // or submit itself to any jurisdiction.
 
+#include "TSystem.h"
 #include "TH1.h"
 #include "TCanvas.h"
 #include "TLegend.h"
@@ -21,6 +22,13 @@ namespace mcstepanalysis
 {
 namespace utilities
 {
+
+bool createDirectory(const std::string& dir)
+{
+  gSystem->mkdir(dir.c_str(), true);
+  // according to documentation returns false if possible to access
+  return (gSystem->AccessPathName(dir.c_str()) == 0);
+}
 
 void compressHistogram(TH1* histo, const char* sortOption)
 {

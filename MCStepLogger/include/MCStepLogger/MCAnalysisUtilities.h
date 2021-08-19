@@ -25,6 +25,9 @@ namespace mcstepanalysis
 {
 namespace utilities
 {
+
+/// check for and create a directory
+bool createDirectory(const std::string& dir);
 /// compressing a histogram with alphanumeric bins and sorting accordingly
 /// for sorting option see ROOT's TH1::LabelsOption
 void compressHistogram(TH1* histo, const char* sortOption = "");
