@@ -3,11 +3,6 @@
 
 set(MODULE_NAME "TMCReplay")
 
-# Minimum version of CMake
-CMAKE_MINIMUM_REQUIRED(VERSION 3.5.0 FATAL_ERROR)
-
-project(${MODULE_NAME})
-
 ################################################################################
 # Basic configurations
 ################################################################################
@@ -44,56 +39,16 @@ set(EXECUTABLE_SRCS
    ${CXX_SOURCE_DIR}/replay.cxx
 )
 
-# include this and MCStepLogger header dir
-message("${EXECUTABLE_NAME}")
-include_directories(${CXX_INCLUDE_DIR} ${CXX_INCLUDE_DIR}/../../MCStepLogger/include)
+mcsl_add_library(
+  TARGETNAME Core
+  BASENAME TMCReplay
+  DEPENDENCIES ROOT::Core ROOT::Hist ROOT::Graf ROOT::Gpad ROOT::Tree ROOT::VMC ROOT::RIO ROOT::Geom ROOT::EG MCStepLoggerCore MCStepLoggerAnalysis
+  SOURCES ${SRCS}
+  INCLUDE_DIRECTORIES ${CMAKE_CURRENT_LIST_DIR}/include
+  LINKDEFDIR ${CMAKE_CURRENT_LIST_DIR}/src
+  ROOT_DICTIONARY_HEADERS ${HEADERS})
 
-
-
-################################################################################
-# ROOT LinkDef --> TODO At the moment nothing defined, but do it anyway already
-################################################################################
-SET(ROOT_DICT_LINKDEF_FILE "${CXX_SOURCE_DIR}/${LIBRARY_NAME}LinkDef.h")
-message(STATUS "LinkDef at ${ROOT_DICT_LINKDEF_FILE}")
-SET(ROOT_DICT_NAME "G__${LIBRARY_NAME}")
-
-ROOT_GENERATE_DICTIONARY(${ROOT_DICT_NAME} ${HEADERS} LINKDEF ${ROOT_DICT_LINKDEF_FILE})
-# Files produced by the dictionary generation
-SET(ROOT_DICT_LIB_FILES
-    "${PROJECT_BINARY_DIR}/lib${LIBRARY_NAME}_rdict.pcm"
-    "${PROJECT_BINARY_DIR}/lib${LIBRARY_NAME}.rootmap"
-)
-
-################################################################################
-# Define targets and executables
-################################################################################
-
-set(LIB_DEPS MCStepLoggerCore MCStepLoggerAnalysis ROOT::Core ROOT::Hist ROOT::Graf ROOT::Gpad ROOT::Tree ROOT::VMC ROOT::RIO ROOT::Geom ROOT::EG)
-add_library(${LIBRARY_NAME} SHARED ${SRCS} "${ROOT_DICT_NAME}.cxx")
-target_link_libraries(${LIBRARY_NAME} ${LIB_DEPS})
-set_target_properties(${LIBRARY_NAME} PROPERTIES INTERFACE_LINK_LIBRARIES "${LIB_DEPS}")
-target_include_directories(${LIBRARY_NAME} INTERFACE $<INSTALL_INTERFACE:include>)
 
 add_executable(${EXECUTABLE_NAME} ${EXECUTABLE_SRCS})
-target_link_libraries(${EXECUTABLE_NAME} ${LIBRARY_NAME} Boost::program_options)
-
-################################################################################
-# Build tests --> TODO Use that at some point
-################################################################################
-#if(NOT BUILD_TESTING)
-#  message(WARNING "No tests are built.")
-#else()
-#  add_subdirectory(test)
-#endif(NOT BUILD_TESTS)
-
-################################################################################
-# Install the project
-################################################################################
-# Install headers
-install(FILES ${HEADERS} DESTINATION ${CURRENT_INSTALL_INC_DIR})
-# Install libraries
-install(TARGETS ${LIBRARY_NAME} DESTINATION ${INSTALL_LIB_DIR} EXPORT ${CMAKE_PROJECT_NAME}Exports)
-# Install binaries
+target_link_libraries(${EXECUTABLE_NAME} TMCReplayCore Boost::program_options)
 install(TARGETS ${EXECUTABLE_NAME} DESTINATION ${INSTALL_BIN_DIR} EXPORT ${CMAKE_PROJECT_NAME}Exports)
-# Install the ROOT dictionary files
-install(FILES ${ROOT_DICT_LIB_FILES} DESTINATION ${INSTALL_LIB_DIR})

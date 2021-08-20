@@ -4,7 +4,7 @@
 set(MODULE_NAME "MCStepLogger")
 
 # Minimum version of CMake
-CMAKE_MINIMUM_REQUIRED(VERSION 3.11.0 FATAL_ERROR)
+CMAKE_MINIMUM_REQUIRED(VERSION 3.15.0 FATAL_ERROR)
 
 project(${MODULE_NAME})
 set(CMAKE_MODULE_PATH
@@ -55,9 +55,12 @@ endif()
 message(STATUS "Build with CXX STD ${CMAKE_CXX_STANDARD}")
 
 
+set(CMAKE_INSTALL_LIBDIR lib)
+set(CMAKE_INSTALL_INCLUDEDIR include)
+
+include(MCStepLoggerUtils)
 
 add_subdirectory(MCStepLogger)
-
 if(MCStepLogger_BUILD_TMCReplay)
   add_subdirectory(TMCReplay)
 endif(MCStepLogger_BUILD_TMCReplay)
