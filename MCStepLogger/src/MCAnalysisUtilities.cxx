@@ -10,6 +10,7 @@
 
 #include "TSystem.h"
 #include "TH1.h"
+#include "TH1F.h"
 #include "TCanvas.h"
 #include "TLegend.h"
 
@@ -80,34 +81,34 @@ bool alignIfAlphanumeric(const std::vector<TH1*> histosIn, std::vector<TH1*>& hi
   histosOut.resize(histosIn.size(), nullptr);
 
   // assume all to be non-alphanumeric if the first one is
-  if(!histosIn[0]->GetXaxis()->IsAlphanumeric()) {
+  //if(!histosIn[0]->GetXaxis()->IsAlphanumeric()) {
     for(int i = 0; i < histosIn.size(); i++) {
       histosOut[i] = histosIn[i];
     }
     return false;
-  }
+  //}
 
   // now comes the tedious part
 
   // collect all labels
   std::vector<std::string> labels;
   for(int i = 0; i < histosIn.size(); i++) {
-    histosOut[i] = (TH1*)histosIn[i]->Clone();
-    histosOut[i]->Reset("ICEMS");
-    histosOut[i]->GetXaxis()->Set(1, 2., 1.);
+    histosOut[i] = new TH1F(std::to_string(i).c_str(), histosIn[i]->GetName(), 1, 2., 1.);
     histosOut[i]->GetXaxis()->SetAlphanumeric();
     histosOut[i]->GetXaxis()->SetCanExtend(kTRUE);
+    histosOut[i]->SetDirectory(0);
     auto axis = histosIn[i]->GetXaxis();
     for(int l = 0; l < axis->GetNbins(); l++) {
       labels.push_back(axis->GetBinLabel(l));
     }
   }
 
-  // erase duplicates
+  // erase duplicates and empty labels (the latter assuming that there are no entries in the histogram)
   std::sort(labels.begin(), labels.end());
   labels.erase(std::unique(labels.begin(), labels.end()), labels.end());
+  labels.erase(std::remove_if(labels.begin(), labels.end(), [](const std::string& s){return s.empty();}), labels.end());
 
-  // arrange new histograms
+  // arrange new histograms and fill label by label
   for(int l = 0; l < labels.size(); l++) {
     for(int i = 0; i < histosIn.size(); i++) {
       auto bin = histosIn[i]->GetXaxis()->FindFixBin(labels[l].c_str());
@@ -122,7 +123,6 @@ bool alignIfAlphanumeric(const std::vector<TH1*> histosIn, std::vector<TH1*>& hi
   }
 
   return true;
-
 }
 
 
@@ -148,11 +148,13 @@ bool drawCompare(const std::vector<std::string>& filePaths, const std::string& o
   while(++it != files.end()) {
     if((it)->getAnalysisMetaInfo().analysisName.compare((it - 1)->getAnalysisMetaInfo().analysisName) != 0) {
       // we have different analysis names
+      std::cout << "Different analysis names" << std::endl;
       return false;
     }
     it->namesHistograms(current);
     if(current.size() != intersection.size()) {
       // found different number of histograms, should not be
+      std::cout << "Bad intersection" << std::endl;
       return false;
     }
     intersect(current, intersection, intersection);
@@ -163,18 +165,17 @@ bool drawCompare(const std::vector<std::string>& filePaths, const std::string& o
 
   for(const auto& inter : intersection) {
 
-    TCanvas c(inter.c_str(), inter.c_str(), 600, 600);
-    TLegend l(0.6, 0.7, 0.89, 0.89);
 
     std::vector<TH1*> histosIn(files.size());
     for(int i = 0; i < files.size(); i++) {
       histosIn[i] = &files[i].getHistogram(inter);
     }
 
-
     std::vector<TH1*> histosOut;
     auto wereAligned = alignIfAlphanumeric(histosIn, histosOut);
 
+    TCanvas c(inter.c_str(), inter.c_str(), 600, 600);
+    TLegend l(0.6, 0.7, 0.89, 0.89);
     c.cd();
     for(int i = 0; i < histosOut.size(); i++) {
       histosOut[i]->SetLineColor(colors[i%colors.size()]);
