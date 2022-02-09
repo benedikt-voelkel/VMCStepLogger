@@ -727,7 +727,7 @@ class MCReplayEngine : public TVirtualMC
   //// Return the number of the current medium
   virtual Int_t CurrentMedium() const override
   {
-    return getMediumId(mCurrentStep->volId);
+    return mCurrentStep->medId;
   }
   // new function (to replace GetMedium() const)
 
@@ -1134,11 +1134,8 @@ class MCReplayEngine : public TVirtualMC
   // interactions with the TGeoManager
   Double_t* makeDoubleArray(Float_t* arrIn, int np) const;
 
-  // Lookup the medium ID for a given volume
-  int getMediumId(int volId) const;
-
   // load cuts and processes for given volume ID
-  void loadCurrentCutsAndProcesses(int volId);
+  void loadCurrentCutsAndProcesses(int medId);
 
   // check whether step is primary
   bool isPrimary(int trackId) const;
@@ -1177,6 +1174,7 @@ class MCReplayEngine : public TVirtualMC
 
     if (!currMap) {
       currMap = new std::vector<P>(defaultParams.begin(), defaultParams.end());
+      //currMap = new std::vector<P>(defaultParams.size(), P{-1});
     }
     (*currMap)[paramIndex] = parval;
     return true;

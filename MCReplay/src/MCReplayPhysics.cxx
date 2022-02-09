@@ -20,7 +20,7 @@ bool mcreplay::physics::isPhoton(int pdg)
 
 bool mcreplay::physics::isElectronPositron(int pdg)
 {
-  return std::abs(pdg) == 11;
+  return pdg == 11;
 }
 
 bool mcreplay::physics::isMuonAntiMuon(int pdg)

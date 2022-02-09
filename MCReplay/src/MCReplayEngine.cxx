@@ -724,22 +724,6 @@ bool MCReplayEngine::isPrimary(int trackId) const
   return false;
 }
 
-int MCReplayEngine::getMediumId(int volId) const
-{
-  if (volId > -1 && volId < mCurrentLookups->volidtomedium.size()) {
-    if (mCurrentLookups->volidtomedium[volId] &&
-        mCurrentLookups->volidtomedium[volId]->size() != 0) {
-      // extract medium name, from that the TGeoMedium and from that finally the ID
-      auto mediumName{*(mCurrentLookups->volidtomedium[volId])};
-      auto medium{mGeoManager->GetMedium(mediumName.c_str())};
-      if (medium) {
-        return medium->GetId();
-      }
-    }
-  }
-  return -1;
-}
-
 Bool_t MCReplayEngine::SetProcess(const char* flagName, Int_t flagValue)
 {
   if (mUpdateProcessesCutsBlocked) {
@@ -760,9 +744,6 @@ Bool_t MCReplayEngine::SetCut(const char* cutName, Double_t cutValue)
 
 Int_t MCReplayEngine::CurrentVolID(Int_t& copyNo) const
 {
-  if (mCurrentStep->outside) {
-    return 0;
-  }
   copyNo = mCurrentStep->copyNo;
   return mCurrentStep->volId;
 }
@@ -785,9 +766,6 @@ Int_t MCReplayEngine::CurrentVolOffID(Int_t off, Int_t& copyNo) const
 
 const char* MCReplayEngine::CurrentVolName() const
 {
-  if (mCurrentStep->outside) {
-    return mGeoManager->GetTopVolume()->GetName();
-  }
   return mCurrentLookups->volidtovolname[mCurrentStep->volId]->c_str();
 }
 
@@ -901,11 +879,11 @@ void MCReplayEngine::Gstpar(Int_t itmed, const char* param, Double_t parval)
   }
 }
 
-void MCReplayEngine::loadCurrentCutsAndProcesses(int volId)
+
+void MCReplayEngine::loadCurrentCutsAndProcesses(int mediumId)
 {
   mCurrentProcesses = &mProcessesGlobal;
   mCurrentCuts = &mCutsGlobal;
-  auto mediumId = getMediumId(volId);
   if (mediumId > -1) {
     if (mProcesses.size() > mediumId && mProcesses[mediumId]) {
       mCurrentProcesses = mProcesses[mediumId];
@@ -923,22 +901,34 @@ bool MCReplayEngine::keepDueToProcesses(const o2::StepInfo& step) const
 
 bool MCReplayEngine::keepDueToCuts(const o2::StepInfo& step) const
 {
+  // mapping of G4 processes to TMCProcess
+  // github.com/vmc-project/geant4_vmc/blob/master/source/physics_list/src/TG4ProcessMCMapPhysics.cxx
+  // TMCProcess
+  // github.com/vmc-project/vmc/blob/master/source/include/TMCProcess
+
   if ((*mCurrentCuts)[11] > 0. && step.E < (*mCurrentCuts)[11]) {
     // check global energy cut
     return false;
   }
   auto pdg = mCurrentLookups->tracktopdg[step.trackID];
-  if ((*mCurrentCuts)[0] > 0. && physics::isPhoton(pdg) && step.E < (*mCurrentCuts)[0]) {
-    return false;
+  if (physics::isPhoton(pdg)) {
+
+    if ((*mCurrentCuts)[0] > 0. && step.E < (*mCurrentCuts)[0]) {
+      //std::cerr << "Photons in volume " << mCurrentLookups->volidtovolname[step.volId]->c_str() << " in medium " << step.medId << " with process " << step.prodprocess << " with energy " << step.E << " and cut " << (*mCurrentCuts)[0] << std::endl;
+      return false;
+    }
   }
-  if ((*mCurrentCuts)[1] > 0. && physics::isElectronPositron(pdg) && step.E < (*mCurrentCuts)[1]) {
-    return false;
+  if (physics::isElectronPositron(pdg)) {
+    if ((*mCurrentCuts)[1] > 0. && step.E < (*mCurrentCuts)[1]) {
+      //std::cerr << "Electrons in " << step.medId << " with process " << step.prodprocess << " with energy " << step.E << " and cut " << (*mCurrentCuts)[1] << std::endl;
+      return false;
+    }
   }
   if (physics::isHadron(pdg)) {
     if (mCurrentLookups->tracktocharge[step.trackID] && (*mCurrentCuts)[3] > 0. && step.E < (*mCurrentCuts)[3]) {
       return false;
     }
-    if ((*mCurrentCuts)[2] > 0. && step.E < (*mCurrentCuts)[2]) {
+    if (!mCurrentLookups->tracktocharge[step.trackID] && (*mCurrentCuts)[2] > 0. && step.E < (*mCurrentCuts)[2]) {
       return false;
     }
   }
@@ -1025,6 +1015,7 @@ void MCReplayEngine::ProcessEvent(Int_t eventId)
   unsigned int nStepsKept{0};
   unsigned int nUserTracks{0};
   unsigned int nStopTrack{0};
+  unsigned int nStepsTrack{0};
 
   TStopwatch stopwatch{};
 
@@ -1043,19 +1034,19 @@ void MCReplayEngine::ProcessEvent(Int_t eventId)
     if (mSkipTrack[step.trackID]) {
       continue;
     }
-    if (mCurrentLookups->tracktoparent[step.trackID] > -1 && mSkipTrack[mCurrentLookups->tracktoparent[step.trackID]]) {
+    /*if (mCurrentLookups->tracktoparent[step.trackID] > -1 && mSkipTrack[mCurrentLookups->tracktoparent[step.trackID]]) {
       // skip recursively in case parent was skipped, only affects secondaries of course
       mSkipTrack[step.trackID] = true;
       continue;
-    }
+    }*/
 
     if (step.entered || step.newtrack) {
       // find the correct set of cuts and processes for this volume
-      loadCurrentCutsAndProcesses(step.volId);
+      loadCurrentCutsAndProcesses(step.medId);
       mGeoManager->cd(step.geopath->c_str());
     }
 
-    // NOW PERFORM EVERYTHIN NECESSARY TO START / FINISH A TRACK
+    // NOW PERFORM EVERYTHING NECESSARY TO START / FINISH A TRACK
 
     if (currentTrackId == step.trackID && mIsTrackStopped) {
       // track can be told to be stopped in replay run due to different states of RNGs of reference and replay run, will be ignored
@@ -1065,6 +1056,7 @@ void MCReplayEngine::ProcessEvent(Int_t eventId)
 
     if (currentTrackId != step.trackID) {
       // Found a new track
+      nStepsTrack = 0;
 
       auto prim = isPrimary(step.trackID);
 
@@ -1080,10 +1072,10 @@ void MCReplayEngine::ProcessEvent(Int_t eventId)
       if (!prim) {
         // decide to skip this secondary immediately, primaries must be popped first since otherwise we might run into inconsitencies with the user stack
         // therefore, it looks as if this secondary never appeared
-        if (!keepStep(step)) {
+        /*if (!keepStep(step)) {
           mSkipTrack[step.trackID] = true;
           continue;
-        }
+        }*/
 
         // only push track if it is a secondary
         // by default just assign the MCStepLogger track ID, but the user stack might then decide to do something else
@@ -1114,15 +1106,20 @@ void MCReplayEngine::ProcessEvent(Int_t eventId)
       }
       fApplication->PreTrack();
 
-      if (!keepStep(step)) {
+      /*if (!keepStep(step)) {
         // This is for primaries since secondaries would have been skipped already above
         mSkipTrack[step.trackID] = true;
         continue;
-      }
+      }*/
 
       // We fix the RNG so in case the hits are somehow based on that, the hits among different Replay runs are exactly reproduced
       gRandom->SetSeed(makeHash(step));
     }
+    if (nStepsTrack > 3 && !step.newtrack && !keepStep(step)) {
+      mSkipTrack[step.trackID] = true;
+      continue;
+    }
+    nStepsTrack++;
 
     mCurrentTrackLength += step.step;
     mCurrentStep = &step;

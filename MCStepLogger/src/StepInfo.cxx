@@ -55,6 +55,7 @@ StepInfo::StepInfo(TVirtualMC* mc)
 
   auto id = mc->CurrentVolID(copyNo);
   volId = id;
+  medId = mc->CurrentMedium();
 
   auto parentID = trackID < stack->GetNprimary() ? -1 : stack->GetCurrentParentTrackNumber();
   lookupstructures.insertParent(trackID, parentID);

@@ -211,6 +211,7 @@ struct StepInfo {
   // long cputimestamp;
   int stepid = -1; // serves as primary key
   int volId = -1;  // keep another branch somewhere mapping this to name, medium, etc.
+  int medId = 0;  // keep another branch somewhere mapping this to name, medium, etc.
   int copyNo = -1;
   int trackID = -1;
   float t = 0.;
