@@ -727,7 +727,7 @@ bool MCReplayEngine::isPrimary(int trackId) const
 Bool_t MCReplayEngine::SetProcess(const char* flagName, Int_t flagValue)
 {
   if (mUpdateProcessesCutsBlocked) {
-    ::Info("MCReplayEngine::Gstpar", "Parameter setting closed, nothing is changed.");
+    ::Info("MCReplayEngine::SetProcess", "Parameter setting closed, nothing is changed.");
     return false;
   }
   return insertProcessOrCut(mProcessesGlobal, physics::namesCuts, flagName, flagValue);
@@ -736,7 +736,7 @@ Bool_t MCReplayEngine::SetProcess(const char* flagName, Int_t flagValue)
 Bool_t MCReplayEngine::SetCut(const char* cutName, Double_t cutValue)
 {
   if (mUpdateProcessesCutsBlocked) {
-    ::Info("MCReplayEngine::Gstpar", "Parameter setting closed, nothing is changed.");
+    ::Info("MCReplayEngine::SetCut", "Parameter setting closed, nothing is changed.");
     return false;
   }
   return insertProcessOrCut(mCutsGlobal, physics::namesCuts, cutName, cutValue);
@@ -906,33 +906,52 @@ bool MCReplayEngine::keepDueToCuts(const o2::StepInfo& step) const
   // TMCProcess
   // github.com/vmc-project/vmc/blob/master/source/include/TMCProcess
 
-  if ((*mCurrentCuts)[11] > 0. && step.E < (*mCurrentCuts)[11]) {
+  auto eKin = step.E - step.mass;
+
+  if ((*mCurrentCuts)[11] > 0. && eKin < (*mCurrentCuts)[11]) {
     // check global energy cut
     return false;
   }
   auto pdg = mCurrentLookups->tracktopdg[step.trackID];
+  auto prodProcess = step.prodprocess;
   if (physics::isPhoton(pdg)) {
+    if (prodProcess == TMCProcess::kPNull) {
+      return true;
+    }
+    if ((prodProcess == TMCProcess::kPBrem || prodProcess == TMCProcess::kPNuclearAbsorption || prodProcess == TMCProcess::kPHInhelastic) && (*mCurrentCuts)[5] > 0. || (*mCurrentCuts)[6] > 0.) {
+      return true;
+    }
 
-    if ((*mCurrentCuts)[0] > 0. && step.E < (*mCurrentCuts)[0]) {
-      //std::cerr << "Photons in volume " << mCurrentLookups->volidtovolname[step.volId]->c_str() << " in medium " << step.medId << " with process " << step.prodprocess << " with energy " << step.E << " and cut " << (*mCurrentCuts)[0] << std::endl;
+    if ((*mCurrentCuts)[0] > 0. && eKin < (*mCurrentCuts)[0]) {
+      std::cerr << "Photons in volume " << mCurrentLookups->volidtovolname[step.volId]->c_str() << " in medium " << step.medId << " with process " << step.prodprocess << " with energy " << step.E << " and cut " << (*mCurrentCuts)[0] << std::endl;
       return false;
     }
   }
   if (physics::isElectronPositron(pdg)) {
+    if (prodProcess == TMCProcess::kPNull) {
+      return true;
+    }
+    if ((prodProcess == TMCProcess::kPNuclearAbsorption || prodProcess == TMCProcess::kPMuonNuclear) && (*mCurrentCuts)[7] > 0. || (*mCurrentCuts)[8] > 0.) {
+      return true;
+    }
     if ((*mCurrentCuts)[1] > 0. && step.E < (*mCurrentCuts)[1]) {
-      //std::cerr << "Electrons in " << step.medId << " with process " << step.prodprocess << " with energy " << step.E << " and cut " << (*mCurrentCuts)[1] << std::endl;
+      std::cerr << "Electrons in " << step.medId << " with process " << step.prodprocess << " with energy " << step.E << " and cut " << (*mCurrentCuts)[1] << std::endl;
       return false;
     }
   }
   if (physics::isHadron(pdg)) {
-    if (mCurrentLookups->tracktocharge[step.trackID] && (*mCurrentCuts)[3] > 0. && step.E < (*mCurrentCuts)[3]) {
+    if (mCurrentLookups->tracktocharge[step.trackID] && (*mCurrentCuts)[3] > 0. && eKin < (*mCurrentCuts)[3]) {
+      std::cerr << "charged hadron with pdg " << pdg << " in volume " << mCurrentLookups->volidtovolname[step.volId]->c_str() << " in medium " << step.medId << " with process " << step.prodprocess << " with energy " << step.E << " and cut " << (*mCurrentCuts)[3] << std::endl;
       return false;
     }
-    if (!mCurrentLookups->tracktocharge[step.trackID] && (*mCurrentCuts)[2] > 0. && step.E < (*mCurrentCuts)[2]) {
+    if (!mCurrentLookups->tracktocharge[step.trackID] && (*mCurrentCuts)[2] > 0. && eKin < (*mCurrentCuts)[2]) {
+      std::cerr << "neutral hadron with pdg " << pdg << " in volume " << mCurrentLookups->volidtovolname[step.volId]->c_str() << " in medium " << step.medId << " with process " << step.prodprocess << " with energy " << step.E << " and cut " << (*mCurrentCuts)[2] << std::endl;
       return false;
     }
   }
-  if ((*mCurrentCuts)[4] > 0. && physics::isMuonAntiMuon(pdg) && step.E < (*mCurrentCuts)[4]) {
+  if ((*mCurrentCuts)[4] > 0. && physics::isMuonAntiMuon(pdg) && eKin < (*mCurrentCuts)[4]) {
+    std::cerr << "muon with pdg " << pdg << " in volume " << mCurrentLookups->volidtovolname[step.volId]->c_str() << " in medium " << step.medId << " with process " << step.prodprocess << " with energy " << step.E << " and cut " << (*mCurrentCuts)[4] << std::endl;
+
     return false;
   }
   return true;
@@ -991,7 +1010,9 @@ void MCReplayEngine::ProcessEvent(Int_t eventId)
   mLookupBranch->GetEvent(eventId);
 
   // whether or not to skip certain tracks
-  mSkipTrack.resize(mCurrentLookups->tracktopdg.size(), false);
+  // just allocate more memory if needed and set to -1.
+  mSkipTrack.resize(mCurrentLookups->tracktopdg.size(), -1.);
+  std::cerr << "Event has " << mSkipTrack.size() << " events\n";
   // we need to make sure we follow the indexing of the user stack. During the original simulation, there might have been more tracks pushed than transported. In the replay case, we only have the tracks that have been originally transported. Hence, the indexing this time might be different.
   mUserTrackId.resize(mCurrentLookups->tracktopdg.size(), -1);
   // some caching to be able to run pre- and post-hooks at the right time
@@ -1028,17 +1049,23 @@ void MCReplayEngine::ProcessEvent(Int_t eventId)
       break;
     }
 
-    mSkipTrack[step.trackID] = !step.newtrack && mSkipTrack[step.trackID];
+    auto& skipTrack = mSkipTrack[step.trackID];
 
-    // skip if flagged and increment
-    if (mSkipTrack[step.trackID]) {
+    if (skipTrack >= 0) {
+      if(step.newtrack) {
+        // This is done because we are just resizing only for each new event, so this needs to be done for a new track in case it was set from previous event
+        skipTrack = -1.;
+      } else {
+        // skip if flagged already
+        continue;
+      }
+    }
+
+    if (mCurrentLookups->tracktoparent[step.trackID] > -1 && mSkipTrack[mCurrentLookups->tracktoparent[step.trackID]] >= 0.) {
+      // skip recursively in case parent was skipped, only affects secondaries of course
+      skipTrack = step.E;
       continue;
     }
-    /*if (mCurrentLookups->tracktoparent[step.trackID] > -1 && mSkipTrack[mCurrentLookups->tracktoparent[step.trackID]]) {
-      // skip recursively in case parent was skipped, only affects secondaries of course
-      mSkipTrack[step.trackID] = true;
-      continue;
-    }*/
 
     if (step.entered || step.newtrack) {
       // find the correct set of cuts and processes for this volume
@@ -1072,10 +1099,10 @@ void MCReplayEngine::ProcessEvent(Int_t eventId)
       if (!prim) {
         // decide to skip this secondary immediately, primaries must be popped first since otherwise we might run into inconsitencies with the user stack
         // therefore, it looks as if this secondary never appeared
-        /*if (!keepStep(step)) {
-          mSkipTrack[step.trackID] = true;
+        if (!keepStep(step)) {
+          skipTrack = step.E;
           continue;
-        }*/
+        }
 
         // only push track if it is a secondary
         // by default just assign the MCStepLogger track ID, but the user stack might then decide to do something else
@@ -1106,19 +1133,19 @@ void MCReplayEngine::ProcessEvent(Int_t eventId)
       }
       fApplication->PreTrack();
 
-      /*if (!keepStep(step)) {
+      if (!keepStep(step)) {
         // This is for primaries since secondaries would have been skipped already above
-        mSkipTrack[step.trackID] = true;
+        skipTrack = step.E;
         continue;
-      }*/
+      }
 
       // We fix the RNG so in case the hits are somehow based on that, the hits among different Replay runs are exactly reproduced
       gRandom->SetSeed(makeHash(step));
     }
-    if (nStepsTrack > 3 && !step.newtrack && !keepStep(step)) {
-      mSkipTrack[step.trackID] = true;
-      continue;
-    }
+    // if (nStepsTrack > 3 && !step.newtrack && !keepStep(step)) {
+    //   mSkipTrack[step.trackID] = true;
+    //   continue;
+    // }
     nStepsTrack++;
 
     mCurrentTrackLength += step.step;
