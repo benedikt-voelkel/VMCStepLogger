@@ -898,7 +898,7 @@ bool MCReplayEngine::keepDueToProcesses(const o2::StepInfo& step) const
 {
   return true;
 }
-
+/*
 bool MCReplayEngine::keepDueToCuts(const o2::StepInfo& step) const
 {
   // mapping of G4 processes to TMCProcess
@@ -934,7 +934,7 @@ bool MCReplayEngine::keepDueToCuts(const o2::StepInfo& step) const
     if ((prodProcess == TMCProcess::kPNuclearAbsorption || prodProcess == TMCProcess::kPMuonNuclear) && (*mCurrentCuts)[7] > 0. || (*mCurrentCuts)[8] > 0.) {
       return true;
     }
-    if ((*mCurrentCuts)[1] > 0. && step.E < (*mCurrentCuts)[1]) {
+    if ((*mCurrentCuts)[1] > 0. && eKin < (*mCurrentCuts)[1]) {
       std::cerr << "Electrons in " << step.medId << " with process " << step.prodprocess << " with energy " << step.E << " and cut " << (*mCurrentCuts)[1] << std::endl;
       return false;
     }
@@ -951,6 +951,51 @@ bool MCReplayEngine::keepDueToCuts(const o2::StepInfo& step) const
   }
   if ((*mCurrentCuts)[4] > 0. && physics::isMuonAntiMuon(pdg) && eKin < (*mCurrentCuts)[4]) {
     std::cerr << "muon with pdg " << pdg << " in volume " << mCurrentLookups->volidtovolname[step.volId]->c_str() << " in medium " << step.medId << " with process " << step.prodprocess << " with energy " << step.E << " and cut " << (*mCurrentCuts)[4] << std::endl;
+
+    return false;
+  }
+  return true;
+}
+*/
+bool MCReplayEngine::keepDueToCuts(const o2::StepInfo& step) const
+{
+  // mapping of G4 processes to TMCProcess
+  // github.com/vmc-project/geant4_vmc/blob/master/source/physics_list/src/TG4ProcessMCMapPhysics.cxx
+  // TMCProcess
+  // github.com/vmc-project/vmc/blob/master/source/include/TMCProcess
+
+  auto eKin = step.E - step.mass;
+
+  if ((*mCurrentCuts)[11] > 0. && eKin < (*mCurrentCuts)[11]) {
+    // check global energy cut
+    return false;
+  }
+  auto pdg = mCurrentLookups->tracktopdg[step.trackID];
+  auto prodProcess = step.prodprocess;
+  if (physics::isPhoton(pdg)) {
+    if ((*mCurrentCuts)[0] > 0. && eKin < (*mCurrentCuts)[0]) {
+      //std::cerr << "Photons in volume " << mCurrentLookups->volidtovolname[step.volId]->c_str() << " in medium " << step.medId << " with process " << step.prodprocess << " with energy " << step.E << " and cut " << (*mCurrentCuts)[0] << std::endl;
+      return false;
+    }
+  }
+  if (physics::isElectronPositron(pdg)) {
+    if ((*mCurrentCuts)[1] > 0. && eKin < (*mCurrentCuts)[1]) {
+      //std::cerr << "Electrons in " << step.medId << " with process " << step.prodprocess << " with energy " << step.E << " and cut " << (*mCurrentCuts)[1] << std::endl;
+      return false;
+    }
+  }
+  if (physics::isHadron(pdg)) {
+    if (mCurrentLookups->tracktocharge[step.trackID] && (*mCurrentCuts)[3] > 0. && eKin < (*mCurrentCuts)[3]) {
+      //std::cerr << "charged hadron with pdg " << pdg << " in volume " << mCurrentLookups->volidtovolname[step.volId]->c_str() << " in medium " << step.medId << " with process " << step.prodprocess << " with energy " << step.E << " and cut " << (*mCurrentCuts)[3] << std::endl;
+      return false;
+    }
+    if (!mCurrentLookups->tracktocharge[step.trackID] && (*mCurrentCuts)[2] > 0. && eKin < (*mCurrentCuts)[2]) {
+      //std::cerr << "neutral hadron with pdg " << pdg << " in volume " << mCurrentLookups->volidtovolname[step.volId]->c_str() << " in medium " << step.medId << " with process " << step.prodprocess << " with energy " << step.E << " and cut " << (*mCurrentCuts)[2] << std::endl;
+      return false;
+    }
+  }
+  if ((*mCurrentCuts)[4] > 0. && physics::isMuonAntiMuon(pdg) && eKin < (*mCurrentCuts)[4]) {
+    //std::cerr << "muon with pdg " << pdg << " in volume " << mCurrentLookups->volidtovolname[step.volId]->c_str() << " in medium " << step.medId << " with process " << step.prodprocess << " with energy " << step.E << " and cut " << (*mCurrentCuts)[4] << std::endl;
 
     return false;
   }
@@ -1012,7 +1057,6 @@ void MCReplayEngine::ProcessEvent(Int_t eventId)
   // whether or not to skip certain tracks
   // just allocate more memory if needed and set to -1.
   mSkipTrack.resize(mCurrentLookups->tracktopdg.size(), -1.);
-  std::cerr << "Event has " << mSkipTrack.size() << " events\n";
   // we need to make sure we follow the indexing of the user stack. During the original simulation, there might have been more tracks pushed than transported. In the replay case, we only have the tracks that have been originally transported. Hence, the indexing this time might be different.
   mUserTrackId.resize(mCurrentLookups->tracktopdg.size(), -1);
   // some caching to be able to run pre- and post-hooks at the right time
