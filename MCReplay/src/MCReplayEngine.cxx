@@ -60,6 +60,7 @@ MCReplayEngine::MCReplayEngine() : MCReplayEngine("", "") {}
 
 MCReplayEngine::~MCReplayEngine()
 {
+
   // These are all pointers we own
   // TODO Actually make them unique pointers
   for (auto& m : mProcesses) {
@@ -936,23 +937,55 @@ bool MCReplayEngine::keepDueToCuts(const o2::StepInfo& step) const
     return false;
   }
   auto pdg = mCurrentLookups->tracktopdg[step.trackID];
-  if ((*mCurrentCuts)[0] > 0. && physics::isPhoton(pdg) && step.E < (*mCurrentCuts)[0]) {
-    return false;
+  auto proc = step.prodprocess;
+  if (pdg == -11) { // positron not treated correctly in G4_VMC before
+    return true;
   }
-  if ((*mCurrentCuts)[1] > 0. && physics::isElectronPositron(pdg) && step.E < (*mCurrentCuts)[1]) {
-    return false;
-  }
-  if (physics::isHadron(pdg)) {
-    if (mCurrentLookups->tracktocharge[step.trackID] && (*mCurrentCuts)[3] > 0. && step.E < (*mCurrentCuts)[3]) {
+  if (physics::isPhoton(pdg)) {
+    if (proc == 13 || proc == 23 ) { // kPHadronic or kPHInhelastic  
+      // do nothing
+      return true;
+    }
+    if (proc == 8) { // kPBrem
+      // apply BCUTE
+      // NOTE We have no way to tell if this comes from an electron, muon or hadron. G4 however can make that distinction
+      if ((*mCurrentCuts)[5] > 0. && step.E < (*mCurrentCuts)[5]) {
+        return false;
+      }
+      return true;
+    }
+    if ((*mCurrentCuts)[0] > 0. && step.E < (*mCurrentCuts)[0]) {
       return false;
     }
-    if ((*mCurrentCuts)[2] > 0. && step.E < (*mCurrentCuts)[2]) {
+    return true;
+  }
+
+  if (physics::isElectronPositron(pdg)) {
+    if (proc == 2) { // kPEnergyLoss
+      if ((*mCurrentCuts)[7] > 0. && step.E < (*mCurrentCuts)[7]) {
+        return false;
+      }
+      return true;
+    }
+    if ((*mCurrentCuts)[1] > 0. && step.E < (*mCurrentCuts)[1]) {
       return false;
     }
+    return true;
   }
-  if ((*mCurrentCuts)[4] > 0. && physics::isMuonAntiMuon(pdg) && step.E < (*mCurrentCuts)[4]) {
-    return false;
-  }
+
+  // IGNORE THE FOLLOWING FOR NOW
+    
+  // if (physics::isHadron(pdg)) {
+  //   if (mCurrentLookups->tracktocharge[step.trackID] && (*mCurrentCuts)[3] > 0. && step.E < (*mCurrentCuts)[3]) {
+  //     return false;
+  //   }
+  //   if ((*mCurrentCuts)[2] > 0. && step.E < (*mCurrentCuts)[2]) {
+  //     return false;
+  //   }
+  // }
+  // if ((*mCurrentCuts)[4] > 0. && physics::isMuonAntiMuon(pdg) && step.E < (*mCurrentCuts)[4]) {
+  //   return false;
+  // }
   return true;
 }
 
@@ -1013,7 +1046,7 @@ bool MCReplayEngine::startTrack(const o2::StepInfo& step)
   gRandom->SetSeed(makeHash(step));
 
   if (!keepStep(step)) {
-    mSkipTrack[step.trackID] = step.t;
+    mSkipTrack[step.trackID] = true;
     return false;
   }
   return true;
@@ -1049,7 +1082,7 @@ bool MCReplayEngine::stepping()
     // reset the flag for the next track to come
     mIsTrackStopped = false;
     if (mAllowStopTrack) {
-      mSkipTrack[mCurrentStep->trackID] = mCurrentStep->t;
+      mSkipTrack[mCurrentStep->trackID] = true;
       return false;
     }
   }
@@ -1068,7 +1101,7 @@ void MCReplayEngine::ProcessEvent(Int_t eventId)
   mLookupBranch->GetEvent(eventId);
 
   // whether or not to skip certain tracks
-  mSkipTrack.resize(mCurrentLookups->tracktopdg.size(), -1.);
+  mSkipTrack.resize(mCurrentLookups->tracktopdg.size(), false);
   // we need to make sure we follow the indexing of the user stack. During the original simulation, there might have been more tracks pushed than transported. In the replay case, we only have the tracks that have been originally transported. Hence, the indexing this time might be different.
   mUserTrackId.resize(mCurrentLookups->tracktopdg.size(), -1);
   std::cout << "Number of PDGs: " << mUserTrackId.size() << std::endl;
@@ -1104,21 +1137,21 @@ void MCReplayEngine::ProcessEvent(Int_t eventId)
       break;
     }
 
-    mSkipTrack[step.trackID] = !step.newtrack && mSkipTrack[step.trackID] >= 0. ? mSkipTrack[step.trackID] : -1.;
+    // if this is a new track, it will be marked to not be skipped at this point
+    // if this is not a new track, it will be set to whatever mSkipTrack[step.trackID] is
+    mSkipTrack[step.trackID] = !step.newtrack && mSkipTrack[step.trackID];
+
 
     // skip if flagged and increment
-    if (mSkipTrack[step.trackID] >= 0.) {
+    if (mSkipTrack[step.trackID]) {
       continue;
     }
-    if (mCurrentLookups->tracktoparent[step.trackID] > -1) {
-      auto parentTime = mSkipTrack[mCurrentLookups->tracktoparent[step.trackID]];
-      if (parentTime >= 0 && parentTime <= step.t) {
-        // skip recursively in case parent was skipped, only affects secondaries of course
-        mSkipTrack[step.trackID] = step.t;
-        continue;
-      }
+    if (mCurrentLookups->tracktoparent[step.trackID] > -1 && mSkipTrack[mCurrentLookups->tracktoparent[step.trackID]]) {
+      // if the parent was skipped, skip this child track as well
+      mSkipTrack[step.trackID] = true;
+      continue;
     }
-    if (step.entered || step.newtrack) {
+    if (step.entered || step.newtrack || mCurrentTrackId != step.trackID) {
       // find the correct set of cuts and processes for this volume
       loadCurrentCutsAndProcesses(step.volId);
       mGeoManager->cd(step.geopath->c_str());
@@ -1134,7 +1167,7 @@ void MCReplayEngine::ProcessEvent(Int_t eventId)
         // decide to skip this secondary immediately, primaries must be popped first since otherwise we might run into inconsitencies with the user stack
         // therefore, it looks as if this secondary never appeared
         if (!keepStep(step)) {
-          mSkipTrack[step.trackID] = step.t;
+          mSkipTrack[step.trackID] = true;
           mCurrentTrackId = -1;
           continue;
         }

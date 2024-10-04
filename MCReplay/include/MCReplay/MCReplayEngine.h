@@ -1258,7 +1258,7 @@ class MCReplayEngine : public TVirtualMC
   o2::StepInfo* mCurrentStep = nullptr;
 
   // keep track of tracks to be skipped
-  std::vector<float> mSkipTrack;
+  std::vector<bool> mSkipTrack;
   // keep track of track ID assigned by user stack
   std::vector<int> mUserTrackId;
 
